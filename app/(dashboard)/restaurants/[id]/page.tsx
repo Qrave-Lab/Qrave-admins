@@ -147,7 +147,41 @@ export default function RestaurantDetailPage() {
     }
   }
 
-  if (loading || !detail) return <div>Loading restaurant details...</div>;
+  if (loading || !detail) return (
+    <div className="min-h-screen bg-slate-50/50 pb-12">
+      <TopBar title="Restaurant Details" subtitle="Loading..." rightSlot={<RangeTabs value={range} onChange={setRange} />} />
+      <div className="px-6 py-8 max-w-7xl mx-auto space-y-6 animate-pulse">
+        {/* Back + status bar */}
+        <div className="flex items-center justify-between">
+          <div className="h-8 w-40 bg-slate-200 rounded-lg" />
+          <div className="h-6 w-20 bg-slate-100 rounded-full" />
+        </div>
+        {/* KPI row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
+              <div className="h-7 w-16 bg-slate-100 rounded" />
+            </div>
+          ))}
+        </div>
+        {/* Access controls */}
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="h-4 w-40 bg-slate-200 rounded mb-4" />
+          <div className="flex gap-3">
+            <div className="h-9 w-28 bg-slate-100 rounded-lg" />
+            <div className="h-9 w-36 bg-slate-100 rounded-lg" />
+            <div className="h-9 w-36 bg-slate-100 rounded-lg" />
+          </div>
+        </div>
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm h-72" />
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm h-72" />
+        </div>
+      </div>
+    </div>
+  );
 
   const { restaurant } = detail;
 

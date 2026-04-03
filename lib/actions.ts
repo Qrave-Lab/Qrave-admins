@@ -95,24 +95,48 @@ export async function deleteMenuItem(itemId: string) {
 export async function addStaff(restaurantId: string, data: any) {
     await assertQAdminSession();
     try {
-
         const { email, name, phone, role } = data;
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const normalizedName = String(name || "").trim();
+        const normalizedPhone = String(phone || "").trim();
+        const normalizedRole = String(role || "").trim();
+
+        if (!normalizedEmail || !normalizedName || !normalizedRole) {
+            return { success: false, error: "Name, email, and role are required" };
+        }
         
         let userId;
-        const userRes = await db.query("SELECT id FROM users WHERE email = $1", [email]);
+        const userRes = await db.query("SELECT id FROM users WHERE lower(email) = $1", [normalizedEmail]);
         if ((userRes.rowCount || 0) > 0) {
             userId = userRes.rows[0].id;
         } else {
-             const newUser = await db.query("INSERT INTO users (email, name, phone) VALUES ($1, $2, $3) RETURNING id", [email, name, phone]);
+             const newUser = await db.query(
+                "INSERT INTO users (email, name, phone) VALUES ($1, $2, $3) RETURNING id",
+                [normalizedEmail, normalizedName, normalizedPhone || null]
+            );
              userId = newUser.rows[0].id;
         }
 
-        await db.query("INSERT INTO restaurant_users (restaurant_id, user_id, role) VALUES ($1, $2, $3)", [restaurantId, userId, role]);
+        const existing = await db.query(
+            "SELECT 1 FROM restaurant_users WHERE restaurant_id = $1 AND user_id = $2",
+            [restaurantId, userId]
+        );
+        if ((existing.rowCount || 0) > 0) {
+            return { success: false, error: "This user is already assigned to the restaurant" };
+        }
+
+        await db.query("INSERT INTO restaurant_users (restaurant_id, user_id, role) VALUES ($1, $2, $3)", [restaurantId, userId, normalizedRole]);
         revalidatePath(`/staff?restaurantId=${restaurantId}`);
         return { success: true };
 
-    } catch (error) {
+    } catch (error: any) {
          console.error("Failed to add staff:", error);
+        if (error?.code === "23514") {
+            return { success: false, error: "Selected role is not supported by the database" };
+        }
+        if (error?.code === "23505") {
+            return { success: false, error: "This email is already in use" };
+        }
         return { success: false, error: "Failed to add staff" };
     }
 }
@@ -121,22 +145,36 @@ export async function updateStaff(restaurantId: string, userId: string, data: an
     await assertQAdminSession();
     try {
         const { email, name, phone, role } = data;
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+        const normalizedName = String(name || "").trim();
+        const normalizedPhone = String(phone || "").trim();
+        const normalizedRole = String(role || "").trim();
+
+        if (!normalizedEmail || !normalizedName || !normalizedRole) {
+            return { success: false, error: "Name, email, and role are required" };
+        }
         
         await db.query(
             "UPDATE users SET email = $1, name = $2, phone = $3 WHERE id = $4",
-            [email, name, phone, userId]
+            [normalizedEmail, normalizedName, normalizedPhone || null, userId]
         );
         
         await db.query(
             "UPDATE restaurant_users SET role = $1 WHERE user_id = $2 AND restaurant_id = $3",
-            [role, userId, restaurantId]
+            [normalizedRole, userId, restaurantId]
         );
 
         revalidatePath(`/staff?restaurantId=${restaurantId}`);
         return { success: true };
 
-    } catch (error) {
+    } catch (error: any) {
          console.error("Failed to update staff:", error);
+        if (error?.code === "23514") {
+            return { success: false, error: "Selected role is not supported by the database" };
+        }
+        if (error?.code === "23505") {
+            return { success: false, error: "This email is already in use" };
+        }
         return { success: false, error: "Failed to update staff" };
     }
 }

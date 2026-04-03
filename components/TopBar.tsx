@@ -9,7 +9,7 @@ type Props = {
 export default function TopBar({ title, subtitle, rightSlot }: Props) {
   return (
     <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-brand-200 transition-all">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-8 py-6 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-5 sm:px-6 xl:px-8 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           {typeof title === "string" ? (
             <h1 className="truncate text-3xl font-bold tracking-tight text-brand-900">{title}</h1>

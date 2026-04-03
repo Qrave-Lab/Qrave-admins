@@ -13,7 +13,6 @@ export default function MenuManager({ restaurants }: MenuManagerProps) {
     const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Form states
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [newItemName, setNewItemName] = useState("");
     const [newItemDesc, setNewItemDesc] = useState("");
@@ -22,19 +21,22 @@ export default function MenuManager({ restaurants }: MenuManagerProps) {
     const [newItemGlb, setNewItemGlb] = useState("");
     const [isVeg, setIsVeg] = useState(true);
     const [isAvailable, setIsAvailable] = useState(true);
-    const [categoryId, setCategoryId] = useState(""); 
+    const [categoryId, setCategoryId] = useState("");
+
+    const selectedRestaurantName =
+        restaurants.find((restaurant: any) => restaurant.id === selectedRestaurant)?.name || "";
+    const availableCount = menuItems.filter((item: any) => item.is_available).length;
+    const threeDReadyCount = menuItems.filter((item: any) => item.model_glb).length;
 
     const fetchMenu = async (restaurantId: string) => {
         setLoading(true);
         try {
-             const [menuRes, catRes] = await Promise.all([
+            const [menuRes, catRes] = await Promise.all([
                 fetch(`/api/menu?restaurantId=${restaurantId}`),
-                fetch(`/api/menu/categories?restaurantId=${restaurantId}`)
-             ]);
-
-             if (menuRes.ok) setMenuItems(await menuRes.json());
-             if (catRes.ok) setCategories(await catRes.json());
-             
+                fetch(`/api/menu/categories?restaurantId=${restaurantId}`),
+            ]);
+            if (menuRes.ok) setMenuItems(await menuRes.json());
+            if (catRes.ok) setCategories(await catRes.json());
         } catch (error) {
             console.error("Failed to fetch menu/categories", error);
         } finally {
@@ -52,7 +54,7 @@ export default function MenuManager({ restaurants }: MenuManagerProps) {
     };
 
     const resetForm = () => {
-        setNewItemName(""); setNewItemDesc(""); setNewItemPrice(""); 
+        setNewItemName(""); setNewItemDesc(""); setNewItemPrice("");
         setNewItemImage(""); setNewItemGlb("");
         setIsVeg(true); setIsAvailable(true); setCategoryId("");
         setEditingItemId(null);
@@ -72,7 +74,6 @@ export default function MenuManager({ restaurants }: MenuManagerProps) {
 
     const handleSubmit = async () => {
         if (!selectedRestaurant) return;
-        
         try {
             const payload = {
                 name: newItemName,
@@ -80,239 +81,349 @@ export default function MenuManager({ restaurants }: MenuManagerProps) {
                 price: parseFloat(newItemPrice),
                 imageUrl: newItemImage,
                 modelGlb: newItemGlb,
-                isVeg: isVeg,
-                isAvailable: isAvailable,
-                categoryId: categoryId || null 
+                isVeg,
+                isAvailable,
+                categoryId: categoryId || null,
             };
-
             if (editingItemId) {
                 await updateMenuItem(selectedRestaurant, editingItemId, payload);
             } else {
                 await addMenuItem(selectedRestaurant, payload);
             }
-
             fetchMenu(selectedRestaurant);
             resetForm();
         } catch (e) {
             console.error(e);
             alert("Failed to save item");
         }
-    }
+    };
 
     const handleDelete = async (id: string) => {
         if (confirm("Are you sure?")) {
             await deleteMenuItem(id);
             if (selectedRestaurant) fetchMenu(selectedRestaurant);
         }
-    }
+    };
 
     return (
-        <div>
-            <div className="mb-8 max-w-md relative">
-                <label className="block mb-2 text-sm font-bold text-slate-800 uppercase tracking-wider">Select Restaurant</label>
-                <div className="relative">
-                    <select 
-                        className="w-full appearance-none p-3.5 px-4 bg-white border border-slate-200 rounded-xl text-slate-900 font-semibold shadow-sm focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all cursor-pointer"
-                        value={selectedRestaurant}
-                        onChange={handleRestaurantChange}
-                        style={{ backgroundImage: `url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="%2364748b" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
-                    >
-                        <option value="" disabled hidden>-- Select Restaurant --</option>
-                        {restaurants.map((r: any) => (
-                            <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                    </select>
+        <div className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 xl:px-8">
+            {/* Restaurant Selector */}
+            <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,360px)_1fr] xl:items-center">
+                    <div>
+                        <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">
+                            Select Restaurant
+                        </label>
+                        <select
+                            className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition-all focus:border-slate-900 focus:ring-2 focus:ring-slate-900"
+                            value={selectedRestaurant}
+                            onChange={handleRestaurantChange}
+                            style={{
+                                backgroundImage: `url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="%2364748b" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>')`,
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "right 1rem center",
+                                backgroundSize: "1rem",
+                            }}
+                        >
+                            <option value="" disabled hidden>-- Select a Restaurant --</option>
+                            {restaurants.map((r: any) => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Catalog</p>
+                            <p className="mt-2 text-2xl font-black tracking-tight text-slate-900">{menuItems.length}</p>
+                            <p className="text-sm text-slate-500">total items</p>
+                        </div>
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-600">Live</p>
+                            <p className="mt-2 text-2xl font-black tracking-tight text-emerald-900">{availableCount}</p>
+                            <p className="text-sm text-emerald-700">available now</p>
+                        </div>
+                        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600">3D Assets</p>
+                            <p className="mt-2 text-2xl font-black tracking-tight text-indigo-900">{threeDReadyCount}</p>
+                            <p className="text-sm text-indigo-700">items with models</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            {/* Empty state */}
+            {!selectedRestaurant && (
+                <div className="flex flex-col items-center justify-center py-24 rounded-2xl border-2 border-dashed border-slate-200 bg-white text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 3h2l.4 2M7 13h10l4-8H5.4"/><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                        </svg>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">No restaurant selected</p>
+                    <p className="text-sm text-slate-400">Choose a restaurant above to manage its menu</p>
+                </div>
+            )}
+
             {selectedRestaurant && (
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                     {/* List */}
-                    <div className="xl:col-span-2 space-y-5">
-                        <div className="flex justify-between items-center mb-2">
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Menu Items <span className="text-slate-400 font-medium ml-2 text-lg">({menuItems.length})</span></h2>
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_400px] xl:items-start">
+                    {/* ── Menu List ── */}
+                    <div className="flex-1 min-w-0">
+                        <div className="mb-5 rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-sm sm:px-6">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Menu Board</p>
+                                    <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                                        {selectedRestaurantName || "Restaurant"} menu items
+                                    </h2>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        {menuItems.length} item{menuItems.length !== 1 ? "s" : ""} listed across the live menu catalog.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                        {categories.length} categories
+                                    </span>
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                        {menuItems.length - availableCount} hidden
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        
+
                         {loading ? (
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {[1,2,3,4].map(i => (
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+                                {[1, 2, 3, 4].map(i => (
                                     <div key={i} className="animate-pulse bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                        <div className="aspect-video bg-slate-100 w-full" />
-                                        <div className="p-5">
-                                            <div className="h-5 w-3/4 bg-slate-200 rounded mb-3" />
-                                            <div className="h-4 w-full bg-slate-100 rounded mb-2" />
-                                            <div className="h-4 w-5/6 bg-slate-100 rounded mb-5" />
-                                            <div className="border-t border-slate-50 pt-4 flex justify-between">
+                                        <div className="h-44 bg-slate-100 w-full" />
+                                        <div className="p-5 space-y-3">
+                                            <div className="h-5 w-3/4 bg-slate-200 rounded" />
+                                            <div className="h-4 w-full bg-slate-100 rounded" />
+                                            <div className="h-4 w-2/3 bg-slate-100 rounded" />
+                                            <div className="flex justify-between pt-2 border-t border-slate-50">
                                                 <div className="h-3 w-20 bg-slate-100 rounded" />
+                                                <div className="h-3 w-16 bg-slate-100 rounded" />
                                             </div>
                                         </div>
                                     </div>
                                 ))}
-                             </div>
+                            </div>
+                        ) : menuItems.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 rounded-2xl border-2 border-dashed border-slate-200 bg-white text-center">
+                                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 5v14M5 12h14"/>
+                                    </svg>
+                                </div>
+                                <p className="text-sm font-semibold text-slate-900 mb-1">No menu items yet</p>
+                                <p className="text-sm text-slate-400">Add your first item using the form →</p>
+                            </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
                                 {menuItems.map((item: any) => (
-                                    <div key={item.id} className="relative bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-slate-300 transition-all group delay-75">
-                                        <div className="aspect-video w-full bg-slate-100 relative">
+                                    <div key={item.id} className="group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/70">
+                                        {/* Image area */}
+                                        <div className="relative h-48 w-full overflow-hidden bg-slate-100 shrink-0">
                                             {item.image_url ? (
-                                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                                <img
+                                                    src={item.image_url}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-slate-400 font-medium text-sm">No Image</div>
+                                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-2">
+                                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                                                    </svg>
+                                                    <span className="text-xs font-medium">No image</span>
+                                                </div>
                                             )}
-                                            <div className="absolute top-3 right-3 flex gap-2">
-                                                <span className={`px-2.5 py-1 text-[10px] uppercase tracking-widest font-black rounded-lg shadow-sm border ${item.is_veg ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
-                                                    {item.is_veg ? 'VEG' : 'NON-VEG'}
+
+                                            {/* Top-left: Veg/Non-Veg + Availability */}
+                                            <div className="absolute top-3 left-3 flex gap-1.5">
+                                                <span className={`px-2 py-0.5 text-[10px] uppercase tracking-wider font-black rounded-md shadow-sm ${item.is_veg ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"}`}>
+                                                    {item.is_veg ? "Veg" : "Non-Veg"}
                                                 </span>
-                                                 {!item.is_available && (
-                                                    <span className="px-2.5 py-1 text-[10px] uppercase tracking-widest font-black rounded-lg shadow-sm bg-slate-800 text-white border border-slate-700">
+                                                {!item.is_available && (
+                                                    <span className="px-2 py-0.5 text-[10px] uppercase tracking-wider font-black rounded-md bg-slate-800 text-white shadow-sm">
                                                         Sold Out
                                                     </span>
                                                 )}
                                             </div>
-                                        </div>
-                                        <div className="p-5">
-                                            <div className="flex justify-between items-start mb-2 gap-4">
-                                                <h3 className="font-bold text-lg leading-tight text-slate-900">{item.name}</h3>
-                                                <span className="font-black text-slate-900 shrink-0 bg-slate-100 px-2 py-1 rounded-md text-sm border border-slate-200">₹{item.price}</span>
-                                            </div>
-                                            <p className="text-sm text-slate-500 line-clamp-2 mb-4 h-10">{item.description || "No description provided."}</p>
-                                            
-                                            <div className="flex justify-between items-center text-xs font-semibold text-slate-500 border-t border-slate-100 pt-4">
-                                                 <span className="uppercase tracking-wider">Cat: <span className="text-slate-800">{categories.find(c => c.id === item.category_id)?.name || 'Uncategorized'}</span></span>
-                                                 {item.model_glb && <span className="text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">3D Ready</span>}
+
+                                            {/* Top-right: Price */}
+                                            <div className="absolute top-3 right-3">
+                                                <span className="px-2.5 py-1 text-sm font-black rounded-lg bg-white/95 backdrop-blur-sm text-slate-900 shadow-sm">
+                                                    ₹{item.price}
+                                                </span>
                                             </div>
 
-                                            <div className="absolute top-3 left-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button 
+                                            {/* Hover overlay: edit/delete */}
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-end p-3">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200">
+                                                    <button
+                                                        onClick={() => handleEdit(item)}
+                                                        className="p-2 bg-white text-slate-700 rounded-xl shadow-md hover:bg-slate-50 transition-colors"
+                                                        title="Edit"
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="p-2 bg-white text-rose-500 rounded-xl shadow-md hover:bg-rose-50 transition-colors"
+                                                        title="Delete"
+                                                    >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Card body */}
+                                        <div className="flex flex-1 flex-col p-5">
+                                            <h3 className="mb-1.5 text-lg font-black leading-snug text-slate-900">{item.name}</h3>
+                                            <p className="min-h-[2.75rem] text-sm leading-relaxed text-slate-500 line-clamp-2">
+                                                {item.description || "No description provided."}
+                                            </p>
+                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold tracking-wide text-slate-600">
+                                                    {categories.find((c: any) => c.id === item.category_id)?.name || "Uncategorized"}
+                                                </span>
+                                                {item.model_glb && (
+                                                    <span className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-600">3D Ready</span>
+                                                )}
+                                            </div>
+                                            <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
+                                                <span className="text-xs font-semibold text-slate-500">
+                                                    {item.is_available ? "Visible in menu" : "Hidden from menu"}
+                                                </span>
+                                                <button
                                                     onClick={() => handleEdit(item)}
-                                                    className="p-2 bg-white text-slate-700 rounded-xl shadow-md border hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                                                    title="Edit Item"
+                                                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDelete(item.id)}
-                                                    className="p-2 bg-white text-rose-600 rounded-xl shadow-md border hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                                                    title="Delete Item"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                    Edit Item
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
-                                {menuItems.length === 0 && (
-                                    <div className="col-span-full py-16 text-center text-slate-500 bg-slate-50 rounded-2xl border-dashed border-2 border-slate-200">
-                                        <h3 className="text-lg font-bold text-slate-900 mb-1">No menu items found</h3>
-                                        <p className="text-sm">Add your first item to get started.</p>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
 
-                    {/* Add Form */}
-                    <div className="bg-white p-6 rounded-xl shadow-md border h-fit sticky top-6">
-                        <div className="flex justify-between items-center mb-4 border-b pb-2">
-                            <h2 className="text-lg font-bold text-gray-800">{editingItemId ? 'Edit Item' : 'Add New Item'}</h2>
-                            {editingItemId && (
-                                <button onClick={resetForm} className="text-xs text-gray-500 underline hover:text-gray-800">Cancel</button>
-                            )}
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
-                                <input 
-                                    className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                    value={newItemName}
-                                    onChange={(e) => setNewItemName(e.target.value)}
-                                    placeholder="e.g. Margherita Pizza"
-                                />
-                            </div>
-                            
-                             <div className="grid grid-cols-2 gap-3">
+                    {/* ── Add / Edit Form ── */}
+                    <div className="xl:min-w-0">
+                        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm xl:sticky xl:top-28">
+                            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Price (₹)</label>
-                                    <input 
-                                        type="number"
-                                        className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                        value={newItemPrice}
-                                        onChange={(e) => setNewItemPrice(e.target.value)}
-                                        placeholder="0.00"
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Item Studio</p>
+                                    <h3 className="mt-1 text-lg font-black text-slate-900">{editingItemId ? "Edit Item" : "Add New Item"}</h3>
+                                    <p className="mt-1 text-sm text-slate-500">{editingItemId ? "Update item details and availability" : "Fill in the details below"}</p>
+                                </div>
+                                {editingItemId && (
+                                    <button onClick={resetForm} className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100">
+                                        ✕ Cancel
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="px-6 py-5 space-y-5">
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Item Name</label>
+                                    <input
+                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 bg-white"
+                                        value={newItemName}
+                                        onChange={e => setNewItemName(e.target.value)}
+                                        placeholder="e.g. Margherita Pizza"
                                     />
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Price (₹)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all bg-white"
+                                            value={newItemPrice}
+                                            onChange={e => setNewItemPrice(e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Category</label>
+                                        <select
+                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all cursor-pointer bg-white"
+                                            value={categoryId}
+                                            onChange={e => setCategoryId(e.target.value)}
+                                        >
+                                            <option value="">None</option>
+                                            {categories.map((c: any) => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-                                    <select 
-                                        className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                        value={categoryId}
-                                        onChange={(e) => setCategoryId(e.target.value)}
-                                    >
-                                        <option value="">None</option>
-                                        {categories.map((c: any) => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
+                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Description</label>
+                                    <textarea
+                                        rows={3}
+                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all resize-none placeholder:text-slate-300 bg-white leading-relaxed"
+                                        value={newItemDesc}
+                                        onChange={e => setNewItemDesc(e.target.value)}
+                                        placeholder="Brief description..."
+                                    />
                                 </div>
-                             </div>
 
-                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                                <textarea 
-                                    rows={3}
-                                    className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none resize-none"
-                                    value={newItemDesc}
-                                    onChange={(e) => setNewItemDesc(e.target.value)}
-                                    placeholder="Brief description of the item"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Configuration</label>
-                                <div className="flex gap-4 p-3 bg-gray-50 rounded border">
-                                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="rounded text-blue-600 focus:ring-blue-500"
-                                            checked={isVeg}
-                                            onChange={(e) => setIsVeg(e.target.checked)}
-                                        />
-                                        <span className="text-gray-700">Veg</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="rounded text-blue-600 focus:ring-blue-500"
-                                            checked={isAvailable}
-                                            onChange={(e) => setIsAvailable(e.target.checked)}
-                                        />
-                                        <span className="text-gray-700">Available</span>
-                                    </label>
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2.5">Configuration</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsVeg(!isVeg)}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${isVeg ? "bg-emerald-500 text-white border-emerald-500" : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"}`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${isVeg ? "bg-white" : "bg-slate-300"}`} />
+                                            Veg
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsAvailable(!isAvailable)}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${isAvailable ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"}`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${isAvailable ? "bg-white" : "bg-slate-300"}`} />
+                                            Available
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Media</label>
-                                <input 
-                                    className="w-full p-2 mb-2 border rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                    value={newItemImage}
-                                    onChange={(e) => setNewItemImage(e.target.value)}
-                                    placeholder="Image URL (https://...)"
-                                />
-                                <input 
-                                    className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-blue-100 outline-none"
-                                    value={newItemGlb}
-                                    onChange={(e) => setNewItemGlb(e.target.value)}
-                                    placeholder="3D Model URL (.glb)"
-                                />
-                            </div>
 
-                            <button 
-                                onClick={handleSubmit}
-                                className={`w-full text-white p-2.5 rounded-lg font-medium transition-colors shadow-lg ${editingItemId ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20' : 'bg-slate-900 hover:bg-black shadow-blue-500/20'}`}
-                            >
-                                {editingItemId ? 'Update Item' : 'Add Item'}
-                            </button>
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Media URLs</label>
+                                    <input
+                                        className="w-full px-3.5 py-2.5 mb-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 bg-white"
+                                        value={newItemImage}
+                                        onChange={e => setNewItemImage(e.target.value)}
+                                        placeholder="Image URL (https://...)"
+                                    />
+                                    <input
+                                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 font-medium focus:ring-2 focus:ring-slate-900 focus:border-slate-900 outline-none transition-all placeholder:text-slate-300 bg-white"
+                                        value={newItemGlb}
+                                        onChange={e => setNewItemGlb(e.target.value)}
+                                        placeholder="3D Model URL (.glb)"
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={handleSubmit}
+                                    className={`w-full text-white py-3 rounded-xl text-sm font-bold transition-all shadow-sm active:scale-[0.98] ${editingItemId ? "bg-indigo-600 hover:bg-indigo-700" : "bg-slate-900 hover:bg-black"}`}
+                                >
+                                    {editingItemId ? "✓ Update Item" : "+ Add Item"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

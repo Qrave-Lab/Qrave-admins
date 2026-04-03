@@ -5,9 +5,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   await requireAuthPage();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex">
       <Sidebar />
-      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden h-screen">{children}</main>
+      <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden min-h-screen pt-[52px] md:pt-0">
+        {children}
+      </main>
     </div>
   );
 }

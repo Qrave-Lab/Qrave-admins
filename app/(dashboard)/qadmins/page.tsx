@@ -84,7 +84,15 @@ export default function QAdminsPage() {
           </div>
 
           {loading ? (
-            <div className="py-8 text-sm text-slate-500">Loading qadmins...</div>
+            <div className="animate-pulse space-y-2">
+              {[1,2,3].map(i => (
+                <div key={i} className="flex gap-6 py-3 border-b border-slate-100">
+                  <div className="h-4 w-32 bg-slate-200 rounded" />
+                  <div className="h-4 w-48 bg-slate-100 rounded" />
+                  <div className="h-4 w-24 bg-slate-100 rounded" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">

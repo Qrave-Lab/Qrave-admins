@@ -91,7 +91,30 @@ export default function OperationsPage() {
   }, [data, query]);
 
   if (loading || !filtered) {
-    return <div className="px-6 py-8 text-sm text-slate-500">Loading platform operations...</div>;
+    return (
+      <>
+        <TopBar title="Operations Control" subtitle="Real-time platform visibility across payments, orders, support tickets, downtime, and promotions." />
+        <div className="mx-auto max-w-7xl space-y-6 px-6 py-8 animate-pulse">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="h-3 w-28 bg-slate-200 rounded mb-3" />
+                <div className="h-7 w-16 bg-slate-100 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
+                <div className="h-7 w-12 bg-slate-100 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 h-64" />
+        </div>
+      </>
+    );
   }
 
   const { summary } = filtered;

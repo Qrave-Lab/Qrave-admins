@@ -11,7 +11,7 @@ export default function LogsPage() {
                 subtitle="Monitor staff feedback, incident signals, and downtime events across the platform."
             />
             <div className="p-8">
-            <Suspense fallback={<div>Loading logs...</div>}>
+            <Suspense fallback={<div className="p-6 space-y-3 animate-pulse">{[1,2,3,4,5].map(i=><div key={i} className="h-12 bg-slate-100 rounded-xl" />)}</div>}>
                 <LogViewer />
             </Suspense>
             </div>

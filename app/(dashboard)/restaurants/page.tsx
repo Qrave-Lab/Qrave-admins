@@ -74,39 +74,16 @@ export default function RestaurantsPage() {
     return rows.filter((r) => [r.brandName, r.locationName, r.ownerEmail ?? ""].some((v) => v.toLowerCase().includes(q)));
   }, [rows, queryText]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, RestaurantSummary[]>();
-    filtered.forEach((r) => {
-        if (r.ownerEmail) {
-            const list = map.get(r.ownerEmail) || [];
-            list.push(r);
-            map.set(r.ownerEmail, list);
-        }
-    });
-
-    const enriched = filtered.map(r => {
-        if (!r.ownerEmail) return { ...r, branchType: 'single' };
-        const list = map.get(r.ownerEmail)!;
-        if (list.length <= 1) return { ...r, branchType: 'single' };
-        const sorted = [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        return { ...r, branchType: r.id === sorted[0].id ? 'main' : 'branch' };
-    });
-
-    return enriched.sort((a, b) => b.totalRevenueRange - a.totalRevenueRange);
-  }, [filtered]);
-
   const totals = useMemo(() => {
     const active = rows.filter((r) => r.status === "active").length;
-    const disabled = rows.filter((r) => r.status === "disabled" || r.status === "revoked").length;
     const mrr = rows.reduce((sum, r) => sum + r.mrr, 0);
-    return { active, disabled, mrr };
+    return { active, mrr };
   }, [rows]);
 
   const setStatus = async (restaurantID: string, status: RestaurantStatus) => {
     const snapshot = rows;
     setPendingID(restaurantID);
     setRows((prev) => prev.map((r) => (r.id === restaurantID ? { ...r, status } : r)));
-
     try {
       await updateRestaurantStatus(restaurantID, status);
     } catch {
@@ -118,128 +95,145 @@ export default function RestaurantsPage() {
   };
 
   const handleDeleteSubimt = async () => {
-      if (!deleteId) return;
-      if (deleteConfirm !== "DELETE") {
-          alert("Please type DELETE to confirm");
-          return;
-      }
-      setDeleteBusy(true);
-      try {
-          await deleteRestaurant(deleteId);
-          setRows(prev => prev.filter(r => r.id !== deleteId));
-          setDeleteOpen(false);
-          setDeleteId(null);
-          setDeleteConfirm("");
-      } catch (e) {
-          alert("Failed to delete restaurant");
-      } finally {
-          setDeleteBusy(false);
-      }
+    if (!deleteId) return;
+    if (deleteConfirm !== "DELETE") { alert("Please type DELETE to confirm"); return; }
+    setDeleteBusy(true);
+    try {
+      await deleteRestaurant(deleteId);
+      setRows((prev) => prev.filter((r) => r.id !== deleteId));
+      setDeleteOpen(false); setDeleteId(null); setDeleteConfirm("");
+    } catch { alert("Failed to delete restaurant"); }
+    finally { setDeleteBusy(false); }
   };
 
-  const openDelete = (id: string) => {
-      setDeleteId(id);
-      setDeleteConfirm("");
-      setDeleteOpen(true);
-  };
+  const openDelete = (id: string) => { setDeleteId(id); setDeleteConfirm(""); setDeleteOpen(true); };
 
-  const renderRestaurantContent = (r: RestaurantSummary & { branchType?: string }) => {
+  // Build one display-card per restaurant.
+  // Owners with multiple branches: show their oldest (main) branch, annotate with branch count.
+  const displayCards = useMemo(() => {
+    const byOwner = new Map<string, RestaurantSummary[]>();
+    filtered.forEach((r) => {
+      if (!r.ownerEmail) return;
+      const list = byOwner.get(r.ownerEmail) || [];
+      list.push(r);
+      byOwner.set(r.ownerEmail, list);
+    });
+
+    const cards: (RestaurantSummary & { branchCount: number })[] = [];
+    const seen = new Set<string>();
+
+    filtered.forEach((r) => {
+      if (!r.ownerEmail) {
+        cards.push({ ...r, branchCount: 0 });
+        return;
+      }
+      if (seen.has(r.ownerEmail)) return;
+      seen.add(r.ownerEmail);
+      const group = byOwner.get(r.ownerEmail)!;
+      const sorted = [...group].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      cards.push({ ...sorted[0], branchCount: sorted.length - 1 });
+    });
+
+    return cards.sort((a, b) => b.totalRevenueRange - a.totalRevenueRange);
+  }, [filtered]);
+
+  const renderCard = (r: RestaurantSummary & { branchCount: number }) => {
     const busy = pendingID === r.id;
+    const statusConfig = {
+      active:   { dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700" },
+      disabled: { dot: "bg-amber-500",   badge: "bg-amber-50 text-amber-700"   },
+      revoked:  { dot: "bg-rose-500",    badge: "bg-rose-50 text-rose-700"     },
+      trial:    { dot: "bg-indigo-500",  badge: "bg-indigo-50 text-indigo-700" },
+    } as const;
+    const cfg = statusConfig[r.status as keyof typeof statusConfig] ?? { dot: "bg-slate-400", badge: "bg-slate-100 text-slate-700" };
+
     return (
-      <div className="flex flex-col h-full bg-white rounded-xl">
-        {r.branchType === 'main' && (
-            <span className="inline-flex w-fit items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded border border-indigo-100/50 mb-3">
-                <Store size={12} /> Main HQ
-            </span>
-        )}
-        {r.branchType === 'branch' && (
-            <span className="inline-flex w-fit items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 mb-3">
-                <Layers size={12} /> Other Branch
-            </span>
-        )}
-        <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-bold text-slate-900 leading-tight">{r.brandName}</h3>
-            <p className="text-[13px] text-slate-500 mt-0.5">{r.locationName}</p>
+            <h3 className="truncate text-sm font-bold text-slate-900 leading-tight">{r.brandName}</h3>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">{r.locationName}</p>
           </div>
-          <span
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${
-              r.status === "active" ? "bg-emerald-50 text-emerald-700" :
-                r.status === "disabled" ? "bg-amber-50 text-amber-700" :
-                  r.status === "revoked" ? "bg-rose-50 text-rose-700" :
-                    r.status === "trial" ? "bg-indigo-50 text-indigo-700" :
-                      "bg-slate-100 text-slate-700"
-            }`}
-          >
-            {r.status === "active" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-            {r.status === "disabled" && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
-            {r.status === "revoked" && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
-            {r.status === "trial" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+          <span className={`shrink-0 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${cfg.badge}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
             <span className="capitalize">{r.status}</span>
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm mb-5">
+        {/* Info grid */}
+        <div className="grid grid-cols-2 gap-y-3 gap-x-4 mb-4 flex-1">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 mb-0.5">Owner</p>
-            <p className="truncate text-xs font-semibold text-slate-800">{r.ownerEmail || "-  "}</p>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Owner</p>
+            <p className="truncate text-[11px] font-semibold text-slate-700">{r.ownerEmail || "—"}</p>
           </div>
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 mb-0.5">Plan</p>
-            <p className="text-xs font-semibold text-slate-800 capitalize">{r.plan.replace('_', ' ')}</p>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Plan</p>
+            <p className="text-[11px] font-semibold text-slate-700 capitalize">{r.plan.replace(/_/g, " ")}</p>
           </div>
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 mb-0.5">Member Since</p>
-            <p className="text-xs font-semibold text-slate-800">{r.memberSince}</p>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Since</p>
+            <p className="text-[11px] font-semibold text-slate-700">{r.memberSince}</p>
           </div>
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 mb-0.5">Revenue ({range})</p>
+            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Revenue ({range})</p>
             <p className="text-sm font-bold text-slate-900">₹{r.totalRevenueRange.toLocaleString("en-IN")}</p>
           </div>
         </div>
 
-          <div className="pt-4 mt-auto border-t border-slate-100 flex flex-wrap items-center gap-2">
+        {/* Branch pill */}
+        {r.branchCount > 0 && (
+          <div className="mb-3">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 border border-indigo-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+              <Layers size={10} />
+              +{r.branchCount} other branch{r.branchCount > 1 ? "es" : ""}
+            </span>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
           {r.status !== "active" ? (
             <button
-              className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-xs font-bold transition-all disabled:opacity-50"
+              className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-[11px] font-bold transition-all disabled:opacity-50"
               style={{ color: "white" }}
               disabled={busy}
               onClick={() => setStatus(r.id, "active")}
             >
-              Activate
+              {busy ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Activate"}
             </button>
           ) : (
             <button
-              className="flex-1 rounded-lg bg-amber-500 hover:bg-amber-600 px-3 py-2 text-xs font-bold transition-all disabled:opacity-50"
+              className="flex-1 rounded-lg bg-amber-500 hover:bg-amber-600 px-3 py-2 text-[11px] font-bold transition-all disabled:opacity-50"
               style={{ color: "white" }}
               disabled={busy}
               onClick={() => setStatus(r.id, "disabled")}
             >
-              Disable
+              {busy ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Disable"}
             </button>
           )}
-          
           <button
-             className="flex-1 rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-2 text-xs font-bold transition-all disabled:opacity-50"
+            className="flex-1 rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-2 text-[11px] font-bold transition-all disabled:opacity-50"
             style={{ color: "white" }}
             disabled={busy || r.status === "revoked"}
             onClick={() => setStatus(r.id, "revoked")}
           >
-            Revoke
+            {busy ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Revoke"}
           </button>
-
-          <div className="flex gap-2 ml-auto">
-            <button
-              className="rounded-lg bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-slate-500 p-2 transition-all disabled:opacity-50 flex items-center justify-center"
-              onClick={() => openDelete(r.id)}
-              title="Delete Restaurant"
-            >
-              <Trash2 size={16} />
-            </button>
-            <Link href={`/restaurants/${r.id}`} className="rounded-lg bg-slate-900 hover:bg-black px-4 py-2 text-xs font-bold transition-all flex items-center justify-center shadow-lg" style={{ color: 'white' }}>
-              <span style={{ color: "white" }}>View</span>
-            </Link>
-          </div>
+          <button
+            className="rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-400 p-2 transition-all"
+            onClick={() => openDelete(r.id)}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
+          <Link
+            href={`/restaurants/${r.id}`}
+            className="rounded-lg bg-slate-900 hover:bg-black px-3 py-2 text-[11px] font-bold transition-all"
+            style={{ color: "white" }}
+          >
+            View
+          </Link>
         </div>
       </div>
     );
@@ -254,12 +248,13 @@ export default function RestaurantsPage() {
       />
 
       <section className="px-6 py-8 max-w-7xl mx-auto space-y-6">
+        {/* Search + Create */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               className="w-full rounded-lg border border-slate-200 bg-white py-2 pr-4 text-sm font-medium outline-none transition-all focus:border-slate-400 focus:ring-2 focus:ring-slate-100 shadow-sm placeholder:text-slate-400"
-              style={{ paddingLeft: '2.5rem' }}
+              style={{ paddingLeft: "2.5rem" }}
               placeholder="Search brand, location, or owner..."
               value={queryText}
               onChange={(e) => setQueryText(e.target.value)}
@@ -275,74 +270,66 @@ export default function RestaurantsPage() {
           </button>
         </div>
 
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="grid gap-4 sm:grid-cols-3"
-        >
+        {/* KPI row */}
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-3">
           <motion.div variants={itemVariants} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Restaurants</p>
-            <p className="mt-1.5 text-2xl font-bold text-slate-900">{rows.length}</p>
+            {loading ? <div className="mt-2 h-7 w-16 animate-pulse rounded bg-slate-100" /> : <p className="mt-1.5 text-2xl font-bold text-slate-900">{rows.length}</p>}
           </motion.div>
           <motion.div variants={itemVariants} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Active Licenses</p>
-            <p className="mt-1.5 text-2xl font-bold text-emerald-600">{totals.active}</p>
+            {loading ? <div className="mt-2 h-7 w-10 animate-pulse rounded bg-slate-100" /> : <p className="mt-1.5 text-2xl font-bold text-emerald-600">{totals.active}</p>}
           </motion.div>
           <motion.div variants={itemVariants} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total MRR</p>
-            <p className="mt-1.5 text-2xl font-bold text-slate-900">₹{totals.mrr.toLocaleString("en-IN")}</p>
+            {loading ? <div className="mt-2 h-7 w-20 animate-pulse rounded bg-slate-100" /> : <p className="mt-1.5 text-2xl font-bold text-slate-900">₹{totals.mrr.toLocaleString("en-IN")}</p>}
           </motion.div>
         </motion.div>
 
+        {/* Cards */}
         {loading && rows.length === 0 ? (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 items-start">
-             {[1,2,3,4,5,6].map(i => (
-                <div key={i} className="animate-pulse rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <div className="h-4 w-28 bg-slate-200 rounded mb-2"></div>
-                      <div className="h-3 w-20 bg-slate-100 rounded"></div>
-                    </div>
-                    <div className="h-5 w-16 bg-slate-100 rounded-full"></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="h-3 w-16 bg-slate-100 rounded"></div>
-                    <div className="h-3 w-12 bg-slate-100 rounded"></div>
-                    <div className="h-3 w-20 bg-slate-100 rounded"></div>
-                    <div className="h-3 w-24 bg-slate-100 rounded"></div>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="h-8 flex-1 bg-slate-100 rounded-lg"></div>
-                    <div className="h-8 flex-1 bg-slate-100 rounded-lg"></div>
-                    <div className="h-8 w-10 bg-slate-100 rounded-lg"></div>
-                  </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="animate-pulse rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+                <div className="flex justify-between items-start mb-5">
+                  <div><div className="h-4 w-28 bg-slate-200 rounded mb-2" /><div className="h-3 w-20 bg-slate-100 rounded" /></div>
+                  <div className="h-5 w-16 bg-slate-100 rounded-full" />
                 </div>
-             ))}
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  {[20,14,18,12].map((w, j) => <div key={j} className={`h-3 w-${w} bg-slate-100 rounded`} />)}
+                </div>
+                <div className="flex gap-2 pt-3 border-t border-slate-50">
+                  <div className="h-8 flex-1 bg-slate-100 rounded-lg" />
+                  <div className="h-8 flex-1 bg-slate-100 rounded-lg" />
+                  <div className="h-8 w-8 bg-slate-100 rounded-lg" />
+                  <div className="h-8 w-14 bg-slate-100 rounded-lg" />
+                </div>
+              </div>
+            ))}
           </div>
-        ) : grouped.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+        ) : displayCards.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center"
           >
             <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-                <Search size={20} />
+              <Search size={20} />
             </div>
-            <h3 className="text-sm font-semibold text-slate-900">No restaurants</h3>
-            <p className="text-sm text-slate-500 mt-1">Try adjusting your search criteria.</p>
+            <h3 className="text-sm font-semibold text-slate-900">No restaurants found</h3>
+            <p className="text-sm text-slate-500 mt-1">Try adjusting your search.</p>
           </motion.div>
         ) : (
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 items-start"
+          <motion.div
+            variants={containerVariants} initial="hidden" animate="show"
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch"
           >
             <AnimatePresence>
-              {grouped.map((item: any) => (
-                <motion.div layout variants={itemVariants} key={item.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                   {renderRestaurantContent(item)}
+              {displayCards.map((card) => (
+                <motion.div
+                  layout variants={itemVariants} key={card.id}
+                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  {renderCard(card)}
                 </motion.div>
               ))}
             </AnimatePresence>
