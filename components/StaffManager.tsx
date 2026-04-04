@@ -76,9 +76,9 @@ export default function StaffManager({ restaurants }: { restaurants: Restaurant[
 
   const handleEdit = (staff: Staff) => {
     setEditingStaffId(staff.id);
-    setNewStaffName(staff.name);
-    setNewStaffEmail(staff.email);
-    setNewStaffPhone(staff.phone);
+    setNewStaffName(staff.name || "");
+    setNewStaffEmail(staff.email || "");
+    setNewStaffPhone(staff.phone || "");
     const allowedRole = STAFF_ROLES.some((role) => role.value === staff.role)
       ? (staff.role as StaffRole)
       : "manager";
@@ -88,11 +88,11 @@ export default function StaffManager({ restaurants }: { restaurants: Restaurant[
 
   const handleSubmit = async () => {
     if (!selectedRestaurant) return;
-    if (!newStaffEmail.trim()) {
+    if (!newStaffEmail?.trim()) {
       alert("Email is required");
       return;
     }
-    if (!newStaffName.trim()) {
+    if (!newStaffName?.trim()) {
       alert("Name is required");
       return;
     }
@@ -100,16 +100,16 @@ export default function StaffManager({ restaurants }: { restaurants: Restaurant[
       let result;
       if (editingStaffId) {
           result = await updateStaff(selectedRestaurant, editingStaffId, {
-            name: newStaffName,
-            email: newStaffEmail.trim().toLowerCase(),
-            phone: newStaffPhone.trim(),
+            name: newStaffName?.trim() || "",
+            email: newStaffEmail?.trim().toLowerCase() || "",
+            phone: newStaffPhone?.trim() || "",
             role: newStaffRole,
           });
       } else {
           result = await addStaff(selectedRestaurant, {
-            name: newStaffName,
-            email: newStaffEmail.trim().toLowerCase(),
-            phone: newStaffPhone.trim(),
+            name: newStaffName?.trim() || "",
+            email: newStaffEmail?.trim().toLowerCase() || "",
+            phone: newStaffPhone?.trim() || "",
             role: newStaffRole,
           });
       }

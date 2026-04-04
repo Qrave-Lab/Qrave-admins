@@ -5,31 +5,20 @@ import { useEffect, useMemo, useState } from "react";
 import RangeTabs from "@/components/RangeTabs";
 import TopBar from "@/components/TopBar";
 import { createRestaurant, fetchRestaurants, updateRestaurantStatus, deleteRestaurant } from "@/lib/api";
-import { RestaurantStatus, RestaurantSummary, RevenueRange } from "@/lib/types";
-import { Loader2, Plus, Search, Trash2, X, AlertCircle, CheckCircle2, XCircle, Store, Layers } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-
-const containerVariants: any = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
-
-const itemVariants: any = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
-};
+import { RestaurantStatus, RestaurantSummary, RevenuePoint, RevenueRange } from "@/lib/types";
+import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
 
 export default function RestaurantsPage() {
   const [range, setRange] = useState<RevenueRange>("month");
   const [rows, setRows] = useState<RestaurantSummary[]>([]);
-  const [queryText, setQueryText] = useState("");
+  const [queryText, setQueryText] = useState(""); // Renamed to avoid conflict if any, though query works
   const [pendingID, setPendingID] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState("");
   
-  // Delete Modal
+  // Delete Modal State
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -74,16 +63,59 @@ export default function RestaurantsPage() {
     return rows.filter((r) => [r.brandName, r.locationName, r.ownerEmail ?? ""].some((v) => v.toLowerCase().includes(q)));
   }, [rows, queryText]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<string, RestaurantSummary[]>();
+    const result: (RestaurantSummary | { type: 'group', ownerEmail: string, brandName: string, items: RestaurantSummary[] })[] = [];
+    const singles: RestaurantSummary[] = [];
+
+    filtered.forEach((r) => {
+        if (r.ownerEmail) {
+            const list = map.get(r.ownerEmail) || [];
+            list.push(r);
+            map.set(r.ownerEmail, list);
+        } else {
+            singles.push(r);
+        }
+    });
+
+    for (const [email, list] of map.entries()) {
+        if (list.length > 1) {
+             // Sort by creation date (older first) to pick the "Main" branch
+            const sorted = list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            result.push({ 
+                type: 'group', 
+                ownerEmail: email, 
+                brandName: sorted[0].brandName, 
+                mainBranch: sorted[0],
+                subBranches: sorted.slice(1)
+            });
+        } else {
+            singles.push(list[0]);
+        }
+    }
+
+    return [...result, ...singles].sort((a, b) => {
+         // Sort groups/singles by total revenue desc
+        const revA = 'type' in a ? (a as any).mainBranch.totalRevenueRange + (a as any).subBranches.reduce((acc: number, i: any) => acc + i.totalRevenueRange, 0) : a.totalRevenueRange;
+        const revB = 'type' in b ? (b as any).mainBranch.totalRevenueRange + (b as any).subBranches.reduce((acc: number, i: any) => acc + i.totalRevenueRange, 0) : b.totalRevenueRange;
+        return revB - revA;
+    });
+  }, [filtered]);
+
   const totals = useMemo(() => {
     const active = rows.filter((r) => r.status === "active").length;
+    // ... existing logic
+    const disabled = rows.filter((r) => r.status === "disabled" || r.status === "revoked").length;
     const mrr = rows.reduce((sum, r) => sum + r.mrr, 0);
-    return { active, mrr };
+    return { active, disabled, mrr };
   }, [rows]);
 
   const setStatus = async (restaurantID: string, status: RestaurantStatus) => {
-    const snapshot = rows;
+    // ... existing logic
+     const snapshot = rows;
     setPendingID(restaurantID);
     setRows((prev) => prev.map((r) => (r.id === restaurantID ? { ...r, status } : r)));
+
     try {
       await updateRestaurantStatus(restaurantID, status);
     } catch {
@@ -95,174 +127,122 @@ export default function RestaurantsPage() {
   };
 
   const handleDeleteSubimt = async () => {
-    if (!deleteId) return;
-    if (deleteConfirm !== "DELETE") { alert("Please type DELETE to confirm"); return; }
-    setDeleteBusy(true);
-    try {
-      await deleteRestaurant(deleteId);
-      setRows((prev) => prev.filter((r) => r.id !== deleteId));
-      setDeleteOpen(false); setDeleteId(null); setDeleteConfirm("");
-    } catch { alert("Failed to delete restaurant"); }
-    finally { setDeleteBusy(false); }
+      if (!deleteId) return;
+      if (deleteConfirm !== "DELETE") {
+          alert("Please type DELETE to confirm");
+          return;
+      }
+      setDeleteBusy(true);
+      try {
+          await deleteRestaurant(deleteId);
+          setRows(prev => prev.filter(r => r.id !== deleteId));
+          setDeleteOpen(false);
+          setDeleteId(null);
+          setDeleteConfirm("");
+      } catch (e) {
+          alert("Failed to delete restaurant");
+          console.error(e);
+      } finally {
+          setDeleteBusy(false);
+      }
   };
 
-  const openDelete = (id: string) => { setDeleteId(id); setDeleteConfirm(""); setDeleteOpen(true); };
+  const openDelete = (id: string) => {
+      setDeleteId(id);
+      setDeleteConfirm("");
+      setDeleteOpen(true);
+  };
 
-  // Build one display-card per restaurant.
-  // Owners with multiple branches: show their oldest (main) branch, annotate with branch count.
-  const displayCards = useMemo(() => {
-    const byOwner = new Map<string, RestaurantSummary[]>();
-    filtered.forEach((r) => {
-      if (!r.ownerEmail) return;
-      const list = byOwner.get(r.ownerEmail) || [];
-      list.push(r);
-      byOwner.set(r.ownerEmail, list);
-    });
-
-    const cards: (RestaurantSummary & { branchCount: number })[] = [];
-    const seen = new Set<string>();
-
-    filtered.forEach((r) => {
-      if (!r.ownerEmail) {
-        cards.push({ ...r, branchCount: 0 });
-        return;
-      }
-      if (seen.has(r.ownerEmail)) return;
-      seen.add(r.ownerEmail);
-      const group = byOwner.get(r.ownerEmail)!;
-      const sorted = [...group].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      cards.push({ ...sorted[0], branchCount: sorted.length - 1 });
-    });
-
-    return cards.sort((a, b) => b.totalRevenueRange - a.totalRevenueRange);
-  }, [filtered]);
-
-  const renderCard = (r: RestaurantSummary & { branchCount: number }) => {
+  const renderRestaurantContent = (r: RestaurantSummary) => {
     const busy = pendingID === r.id;
-    const statusConfig = {
-      active:   { dot: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700" },
-      disabled: { dot: "bg-amber-500",   badge: "bg-amber-50 text-amber-700"   },
-      revoked:  { dot: "bg-rose-500",    badge: "bg-rose-50 text-rose-700"     },
-      trial:    { dot: "bg-indigo-500",  badge: "bg-indigo-50 text-indigo-700" },
-    } as const;
-    const cfg = statusConfig[r.status as keyof typeof statusConfig] ?? { dot: "bg-slate-400", badge: "bg-slate-100 text-slate-700" };
-
     return (
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-slate-900 leading-tight">{r.brandName}</h3>
-            <p className="text-xs text-slate-500 mt-0.5 truncate">{r.locationName}</p>
+      <>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-lg font-semibold text-gray-900">{r.brandName}</h3>
+            <p className="text-sm text-gray-500">{r.locationName}</p>
           </div>
-          <span className={`shrink-0 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${cfg.badge}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            <span className="capitalize">{r.status}</span>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+              r.status === "active" ? "bg-green-100 text-green-700" :
+                r.status === "disabled" ? "bg-amber-100 text-amber-700" :
+                  r.status === "revoked" ? "bg-red-100 text-red-700" :
+                    r.status === "trial" ? "bg-indigo-100 text-indigo-700" :
+                      "bg-rose-100 text-rose-700"
+            }`}
+          >
+            {r.status}
           </span>
         </div>
 
-        {/* Info grid */}
-        <div className="grid grid-cols-2 gap-y-3 gap-x-4 mb-4 flex-1">
-          <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Owner</p>
-            <p className="truncate text-[11px] font-semibold text-slate-700">{r.ownerEmail || "—"}</p>
+        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          <div className="min-w-0">
+            <dt className="text-xs uppercase tracking-wide text-gray-500">Owner</dt>
+            <dd className="truncate font-medium text-gray-800">{r.ownerEmail || "-"}</dd>
           </div>
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Plan</p>
-            <p className="text-[11px] font-semibold text-slate-700 capitalize">{r.plan.replace(/_/g, " ")}</p>
+            <dt className="text-xs uppercase tracking-wide text-gray-500">Plan</dt>
+            <dd className="font-medium capitalize text-gray-800">{r.plan}</dd>
           </div>
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Since</p>
-            <p className="text-[11px] font-semibold text-slate-700">{r.memberSince}</p>
+            <dt className="text-xs uppercase tracking-wide text-gray-500">Member Since</dt>
+            <dd className="font-medium text-gray-800">{r.memberSince}</dd>
           </div>
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">Revenue ({range})</p>
-            <p className="text-sm font-bold text-slate-900">₹{r.totalRevenueRange.toLocaleString("en-IN")}</p>
+            <dt className="text-xs uppercase tracking-wide text-gray-500">Revenue ({range})</dt>
+            <dd className="font-semibold text-gray-900">₹{r.totalRevenueRange.toLocaleString("en-IN")}</dd>
           </div>
-        </div>
+        </dl>
 
-        {/* Branch pill */}
-        {r.branchCount > 0 && (
-          <div className="mb-3">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 border border-indigo-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-600">
-              <Layers size={10} />
-              +{r.branchCount} other branch{r.branchCount > 1 ? "es" : ""}
-            </span>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="pt-3 border-t border-slate-100 flex items-center gap-2 flex-wrap">
-          {r.status !== "active" ? (
-            <button
-              className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-[11px] font-bold transition-all disabled:opacity-50"
-              style={{ color: "white" }}
-              disabled={busy}
-              onClick={() => setStatus(r.id, "active")}
-            >
-              {busy ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Activate"}
-            </button>
-          ) : (
-            <button
-              className="flex-1 rounded-lg bg-amber-500 hover:bg-amber-600 px-3 py-2 text-[11px] font-bold transition-all disabled:opacity-50"
-              style={{ color: "white" }}
-              disabled={busy}
-              onClick={() => setStatus(r.id, "disabled")}
-            >
-              {busy ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Disable"}
-            </button>
-          )}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
           <button
-            className="flex-1 rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-2 text-[11px] font-bold transition-all disabled:opacity-50"
-            style={{ color: "white" }}
+            className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+            disabled={busy || r.status === "active"}
+            onClick={() => setStatus(r.id, "active")}
+          >
+            Activate
+          </button>
+          <button
+            className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+            disabled={busy || r.status === "disabled"}
+            onClick={() => setStatus(r.id, "disabled")}
+          >
+            Disable
+          </button>
+          <button
+            className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
             disabled={busy || r.status === "revoked"}
             onClick={() => setStatus(r.id, "revoked")}
           >
-            {busy ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Revoke"}
+            Revoke
           </button>
           <button
-            className="rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-400 p-2 transition-all"
+            className="rounded-md bg-gray-600 hover:bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
             onClick={() => openDelete(r.id)}
-            title="Delete"
           >
-            <Trash2 size={14} />
+            <Trash2 size={12} />
           </button>
-          <Link
-            href={`/restaurants/${r.id}`}
-            className="rounded-lg bg-slate-900 hover:bg-black px-3 py-2 text-[11px] font-bold transition-all"
-            style={{ color: "white" }}
-          >
-            View
+          <Link href={`/restaurants/${r.id}`} className="ml-auto rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
+            Open
           </Link>
         </div>
-      </div>
+      </>
     );
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12">
+    <>
       <TopBar
         title="Restaurants"
-        subtitle="Manage branch access control and subscription health."
+        subtitle="Branch access control and subscription health overview."
         rightSlot={<RangeTabs value={range} onChange={setRange} />}
       />
 
       <section className="px-6 py-8 max-w-7xl mx-auto space-y-6">
-        {/* Search + Create */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              className="w-full rounded-lg border border-slate-200 bg-white py-2 pr-4 text-sm font-medium outline-none transition-all focus:border-slate-400 focus:ring-2 focus:ring-slate-100 shadow-sm placeholder:text-slate-400"
-              style={{ paddingLeft: "2.5rem" }}
-              placeholder="Search brand, location, or owner..."
-              value={queryText}
-              onChange={(e) => setQueryText(e.target.value)}
-            />
-          </div>
+        <div className="flex justify-end">
           <button
             type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             onClick={() => setCreateOpen(true)}
           >
             <Plus size={16} />
@@ -270,272 +250,234 @@ export default function RestaurantsPage() {
           </button>
         </div>
 
-        {/* KPI row */}
-        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-3">
-          <motion.div variants={itemVariants} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Restaurants</p>
-            {loading ? <div className="mt-2 h-7 w-16 animate-pulse rounded bg-slate-100" /> : <p className="mt-1.5 text-2xl font-bold text-slate-900">{rows.length}</p>}
-          </motion.div>
-          <motion.div variants={itemVariants} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Active Licenses</p>
-            {loading ? <div className="mt-2 h-7 w-10 animate-pulse rounded bg-slate-100" /> : <p className="mt-1.5 text-2xl font-bold text-emerald-600">{totals.active}</p>}
-          </motion.div>
-          <motion.div variants={itemVariants} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total MRR</p>
-            {loading ? <div className="mt-2 h-7 w-20 animate-pulse rounded bg-slate-100" /> : <p className="mt-1.5 text-2xl font-bold text-slate-900">₹{totals.mrr.toLocaleString("en-IN")}</p>}
-          </motion.div>
-        </motion.div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <article className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Restaurants</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">{rows.length}</p>
+          </article>
+          <article className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Active</p>
+            <p className="mt-1 text-2xl font-bold text-green-700">{totals.active}</p>
+          </article>
+          <article className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total MRR</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">₹{totals.mrr.toLocaleString("en-IN")}</p>
+          </article>
+        </div>
 
-        {/* Cards */}
+        <div className="relative max-w-xl">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none ring-blue-200 transition focus:border-blue-500 focus:ring-2"
+            placeholder="Search brand, location, owner email"
+            value={queryText}
+            onChange={(e) => setQueryText(e.target.value)}
+          />
+        </div>
+
         {loading && rows.length === 0 ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-                <div className="flex justify-between items-start mb-5">
-                  <div><div className="h-4 w-28 bg-slate-200 rounded mb-2" /><div className="h-3 w-20 bg-slate-100 rounded" /></div>
-                  <div className="h-5 w-16 bg-slate-100 rounded-full" />
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  {[20,14,18,12].map((w, j) => <div key={j} className={`h-3 w-${w} bg-slate-100 rounded`} />)}
-                </div>
-                <div className="flex gap-2 pt-3 border-t border-slate-50">
-                  <div className="h-8 flex-1 bg-slate-100 rounded-lg" />
-                  <div className="h-8 flex-1 bg-slate-100 rounded-lg" />
-                  <div className="h-8 w-8 bg-slate-100 rounded-lg" />
-                  <div className="h-8 w-14 bg-slate-100 rounded-lg" />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-10 text-sm text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading restaurants...
           </div>
-        ) : displayCards.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center"
-          >
-            <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-              <Search size={20} />
-            </div>
-            <h3 className="text-sm font-semibold text-slate-900">No restaurants found</h3>
-            <p className="text-sm text-slate-500 mt-1">Try adjusting your search.</p>
-          </motion.div>
+        ) : grouped.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white py-10 text-center text-sm text-gray-500">
+            No restaurants found.
+          </div>
         ) : (
-          <motion.div
-            variants={containerVariants} initial="hidden" animate="show"
-            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch"
-          >
-            <AnimatePresence>
-              {displayCards.map((card) => (
-                <motion.div
-                  layout variants={itemVariants} key={card.id}
-                  className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-                  {renderCard(card)}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+             <div className="grid gap-4 lg:grid-cols-2">
+            {grouped.map((item) => {
+              if ('type' in item && 'mainBranch' in item && 'subBranches' in item) {
+                  // Type assertion for the grouped object we just created
+                  const group = item as { type: 'group', ownerEmail: string, brandName: string, mainBranch: RestaurantSummary, subBranches: RestaurantSummary[] };
+                  
+                  return (
+                    <div key={`group-${group.ownerEmail}`} className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                        {/* Main Branch */}
+                        <div className="border-b border-gray-100 pb-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Main Branch</span>
+                            </div>
+                           {renderRestaurantContent(group.mainBranch)}
+                        </div>
+
+                        {group.subBranches.length > 0 && (
+                            <div className="border-t border-slate-100 pt-4 mt-4 bg-slate-50/50 -mx-5 -mb-5 p-5 rounded-b-xl">
+                                <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3 px-1">
+                                    <div className="h-px w-3 bg-gray-300"></div>
+                                    Other Branches ({group.subBranches.length})
+                                    <div className="h-px flex-1 bg-gray-200"></div>
+                                </h4>
+                                <div className="space-y-4">
+                                {group.subBranches.map(sub => (
+                                    <div key={sub.id} className="relative bg-white rounded-lg border border-slate-200 p-4 shadow-sm ml-4 before:content-[''] before:absolute before:-left-4 before:top-8 before:h-px before:w-4 before:bg-slate-300 before:z-0 after:content-[''] after:absolute after:-left-4 after:-top-8 after:bottom-1/2 after:w-px after:bg-slate-300 after:z-0 last:after:h-16 last:after:bottom-auto">
+                                        {renderRestaurantContent(sub)}
+                                    </div>
+                                ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                  );
+              }
+              // Render single restaurant
+              return (
+                   <div key={(item as RestaurantSummary).id} className="h-fit rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                      {renderRestaurantContent(item as RestaurantSummary)}
+                   </div>
+              );
+            })}
+          </div>
         )}
       </section>
 
-      {/* Modals */}
-      <AnimatePresence>
-        {createOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 p-4 backdrop-blur-sm overflow-y-auto"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-2xl rounded-2xl border border-brand-100 bg-white p-7 shadow-2xl my-8"
-            >
-              <div className="mb-6 flex items-center justify-between border-b border-brand-100 pb-4">
-                <h3 className="text-xl font-bold tracking-tight text-brand-900">Create New Restaurant</h3>
-                <button
-                  type="button"
-                  className="rounded-xl p-2 text-brand-400 hover:bg-brand-50 hover:text-brand-900 transition-colors"
-                  onClick={() => {
-                    if (!createBusy) setCreateOpen(false);
-                  }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
+      {createOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-2xl border border-white/40 bg-white/90 p-6 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">Create New Restaurant</h3>
+              <button
+                type="button"
+                className="rounded-lg p-1 text-slate-500 hover:bg-slate-100"
+                onClick={() => {
+                  if (!createBusy) setCreateOpen(false);
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-brand-500 px-1">Brand Name</label>
-                  <input
-                    className="rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-medium focus:border-brand-900 focus:ring-1 focus:ring-brand-900 transition-colors outline-none"
-                    placeholder="e.g. Anteiku Coffee"
-                    value={form.brandName}
-                    onChange={(e) => setForm((f) => ({ ...f, brandName: e.target.value }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-brand-500 px-1">Location Details</label>
-                  <input
-                    className="rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-medium focus:border-brand-900 focus:ring-1 focus:ring-brand-900 transition-colors outline-none"
-                    placeholder="e.g. 20th Ward, Tokyo"
-                    value={form.locationName}
-                    onChange={(e) => setForm((f) => ({ ...f, locationName: e.target.value }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-brand-500 px-1">Owner Email</label>
-                  <input
-                    className="rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-medium focus:border-brand-900 focus:ring-1 focus:ring-brand-900 transition-colors outline-none"
-                    placeholder="admin@example.com"
-                    type="email"
-                    value={form.ownerEmail}
-                    onChange={(e) => setForm((f) => ({ ...f, ownerEmail: e.target.value }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-brand-500 px-1">Initial Password</label>
-                  <input
-                    className="rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-medium focus:border-brand-900 focus:ring-1 focus:ring-brand-900 transition-colors outline-none"
-                    placeholder="••••••••"
-                    type="password"
-                    value={form.ownerPassword}
-                    onChange={(e) => setForm((f) => ({ ...f, ownerPassword: e.target.value }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5 border-t border-brand-100 pt-3 md:col-span-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-brand-500 px-1">Subscription Plan</label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <select
-                      className="rounded-xl border border-brand-200 px-4 py-2.5 text-sm font-medium focus:border-brand-900 focus:ring-1 focus:ring-brand-900 transition-colors outline-none"
-                      value={form.plan}
-                      onChange={(e) => setForm((f) => ({ ...f, plan: e.target.value }))}
-                    >
-                      <option value="monthly_499">Starter Monthly (₹499)</option>
-                      <option value="monthly_999">Growth Monthly (₹999)</option>
-                      <option value="monthly_1499">Pro Monthly (₹1499)</option>
-                      <option value="yearly_5500">Starter Yearly (₹5500)</option>
-                      <option value="yearly_10999">Growth Yearly (₹10999)</option>
-                      <option value="yearly_14999">Pro Yearly (₹14999)</option>
-                    </select>
-                    <div className="flex items-center gap-3">
-                       <label className="text-xs font-semibold text-brand-500 whitespace-nowrap">Initial Tables:</label>
-                       <input
-                        className="w-full rounded-xl border border-brand-200 px-4 py-2 text-sm font-bold focus:border-brand-900 focus:ring-1 focus:ring-brand-900 transition-colors outline-none"
-                        placeholder="8"
-                        type="number"
-                        min={1}
-                        max={200}
-                        value={form.initialTables}
-                        onChange={(e) => setForm((f) => ({ ...f, initialTables: Number(e.target.value || 8) }))}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                placeholder="Brand Name"
+                value={form.brandName}
+                onChange={(e) => setForm((f) => ({ ...f, brandName: e.target.value }))}
+              />
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                placeholder="Location / Area"
+                value={form.locationName}
+                onChange={(e) => setForm((f) => ({ ...f, locationName: e.target.value }))}
+              />
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                placeholder="Owner Email"
+                type="email"
+                value={form.ownerEmail}
+                onChange={(e) => setForm((f) => ({ ...f, ownerEmail: e.target.value }))}
+              />
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                placeholder="Owner Password"
+                type="password"
+                value={form.ownerPassword}
+                onChange={(e) => setForm((f) => ({ ...f, ownerPassword: e.target.value }))}
+              />
+              <select
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                value={form.plan}
+                onChange={(e) => setForm((f) => ({ ...f, plan: e.target.value }))}
+              >
+                <option value="monthly_499">Starter Monthly (₹499)</option>
+                <option value="monthly_999">Growth Monthly (₹999)</option>
+                <option value="monthly_1499">Pro Monthly (₹1499)</option>
+                <option value="yearly_5500">Starter Yearly (₹5500)</option>
+                <option value="yearly_10999">Growth Yearly (₹10999)</option>
+                <option value="yearly_14999">Pro Yearly (₹14999)</option>
+              </select>
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                placeholder="Initial Tables"
+                type="number"
+                min={1}
+                max={200}
+                value={form.initialTables}
+                onChange={(e) => setForm((f) => ({ ...f, initialTables: Number(e.target.value || 8) }))}
+              />
+            </div>
 
-              {createError ? (
-                <div className="mt-5 p-3 rounded-xl bg-rose-50 border border-rose-100 text-center">
-                  <p className="text-xs font-bold text-rose-600">{createError}</p>
-                </div>
-              ) : null}
+            {createError ? <p className="mt-3 text-sm font-medium text-red-600">{createError}</p> : null}
 
-              <div className="mt-8 flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-brand-100">
-                <button
-                  type="button"
-                  className="rounded-xl border border-brand-200 bg-white px-5 py-2.5 text-sm font-bold text-brand-600 hover:bg-brand-50 hover:text-brand-900 transition-colors"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createBusy}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                onClick={() => setCreateOpen(false)}
+                disabled={createBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                disabled={createBusy}
+                onClick={async () => {
+                  setCreateError("");
+                  if (!form.brandName.trim() || !form.ownerEmail.trim() || !form.ownerPassword.trim()) {
+                    setCreateError("Brand name, owner email and owner password are required.");
+                    return;
+                  }
+                  setCreateBusy(true);
+                  try {
+                    await createRestaurant(form);
+                    const data = await fetchRestaurants(range);
+                    setRows(data);
+                    setCreateOpen(false);
+                    setForm({
+                      brandName: "",
+                      locationName: "",
+                      ownerEmail: "",
+                      ownerPassword: "",
+                      currency: "INR",
+                      plan: "monthly_499",
+                      initialTables: 8,
+                    });
+                  } catch {
+                    setCreateError("Failed to create restaurant. Check email uniqueness and try again.");
+                  } finally {
+                    setCreateBusy(false);
+                  }
+                }}
+              >
+                {createBusy ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/40 bg-white/90 p-6 shadow-2xl">
+             <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-red-600">Delete Restaurant</h3>
+              <button onClick={() => setDeleteOpen(false)}><X size={18} /></button>
+            </div>
+            <p className="mb-4 text-sm text-gray-700">
+                This action is irreversible. All data (users, menu, orders) will be wiped.
+                <br/>
+                Type <strong>DELETE</strong> to confirm.
+            </p>
+            <input 
+                className="w-full border p-2 rounded mb-4"
+                placeholder="Type DELETE"
+                value={deleteConfirm}
+                onChange={e => setDeleteConfirm(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+                <button onClick={() => setDeleteOpen(false)} className="px-4 py-2 rounded border">Cancel</button>
+                <button 
+                    disabled={deleteBusy || deleteConfirm !== 'DELETE'}
+                    onClick={handleDeleteSubimt}
+                    className="px-4 py-2 rounded bg-red-600 text-white disabled:opacity-50"
                 >
-                  Cancel
+                    {deleteBusy ? 'Deleting...' : 'Confirm Delete'}
                 </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-900 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-brand-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-                  disabled={createBusy}
-                  onClick={async () => {
-                    setCreateError("");
-                    if (!form.brandName.trim() || !form.ownerEmail.trim() || !form.ownerPassword.trim()) {
-                      setCreateError("Brand name, owner email and owner password are required.");
-                      return;
-                    }
-                    setCreateBusy(true);
-                    try {
-                      await createRestaurant(form);
-                      const data = await fetchRestaurants(range);
-                      setRows(data);
-                      setCreateOpen(false);
-                      setForm({
-                        brandName: "",
-                        locationName: "",
-                        ownerEmail: "",
-                        ownerPassword: "",
-                        currency: "INR",
-                        plan: "monthly_499",
-                        initialTables: 8,
-                      });
-                    } catch {
-                      setCreateError("Failed to create restaurant. Check email uniqueness and try again.");
-                    } finally {
-                      setCreateBusy(false);
-                    }
-                  }}
-                >
-                  {createBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={16} />}
-                  {createBusy ? "Provisioning..." : "Create Restaurant"}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-        
-        {deleteOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 p-4 backdrop-blur-sm"
-          >
-            <motion.div 
-               initial={{ scale: 0.95, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               exit={{ scale: 0.95, opacity: 0 }}
-               className="w-full max-w-md rounded-2xl border border-brand-100 bg-white p-7 shadow-2xl"
-            >
-               <div className="mb-5 flex items-center justify-between border-b border-brand-100 pb-3">
-                <h3 className="text-lg font-black tracking-tight text-rose-600 flex items-center gap-2">
-                  <AlertCircle size={20} /> Destroy Data
-                </h3>
-                <button onClick={() => setDeleteOpen(false)} className="rounded-lg p-1 text-brand-400 hover:bg-brand-50 hover:text-brand-900 transition-colors"><X size={18} /></button>
-              </div>
-              <p className="mb-5 text-sm font-medium text-brand-600 leading-relaxed bg-rose-50/50 p-4 rounded-xl border border-rose-100">
-                  This action is <strong>unrecoverable</strong>. All users, menu categories, items, and orders for this branch will be wiped permanently from the database.
-              </p>
-              <div className="mb-6">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-brand-500 px-1 mb-1 block">Type DELETE to confirm</label>
-                <input 
-                    className="w-full rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-bold text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-colors outline-none placeholder:font-normal placeholder:text-rose-300"
-                    placeholder="DELETE"
-                    value={deleteConfirm}
-                    onChange={e => setDeleteConfirm(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
-                  <button onClick={() => setDeleteOpen(false)} className="rounded-xl border border-brand-200 px-4 py-2 text-sm font-bold text-brand-600 hover:bg-brand-50 transition-colors">Cancel</button>
-                  <button 
-                      disabled={deleteBusy || deleteConfirm !== 'DELETE'}
-                      onClick={handleDeleteSubimt}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-5 py-2 text-sm font-bold text-white hover:bg-rose-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  >
-                      {deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 size={16} />}
-                      {deleteBusy ? 'Destroying...' : 'Permanently Delete'}
-                  </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
