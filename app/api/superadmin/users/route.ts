@@ -9,8 +9,9 @@ export async function POST(request: Request) {
 
     try {
         const { username, password } = await request.json();
+        const normalizedUsername = String(username || "").trim().toLowerCase();
 
-        if (!username || !password) {
+        if (!normalizedUsername || !password) {
             return NextResponse.json({ error: "username and password are required" }, { status: 400 });
         }
 
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
         await db.query(`
       INSERT INTO superadmin_users (username, password)
       VALUES ($1, $2)
-    `, [username, hashedPassword]);
+        `, [normalizedUsername, hashedPassword]);
 
         return NextResponse.json({ success: true, message: "Superadmin created successfully" });
     } catch (err: any) {

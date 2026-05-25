@@ -6,6 +6,7 @@ import {
   FeedbackItem,
   GlobalDiscount,
   Overview,
+  PaymentHistoryRecord,
   PlatformOperations,
   QAdminUser,
   RestaurantDetail,
@@ -41,6 +42,10 @@ export async function fetchRestaurants(range: RevenueRange): Promise<RestaurantS
 
 export async function fetchRestaurantDetail(id: string, range: RevenueRange): Promise<RestaurantDetail> {
   return getJSON<RestaurantDetail>(`/api/superadmin/restaurants/${id}?range=${range}`);
+}
+
+export async function fetchRestaurantPaymentHistory(id: string): Promise<PaymentHistoryRecord[]> {
+  return getJSON<PaymentHistoryRecord[]>(`/api/superadmin/restaurants/${id}/payments`);
 }
 
 export async function fetchRevenueSeries(range: RevenueRange): Promise<RevenuePoint[]> {
@@ -198,5 +203,18 @@ export async function createQAdmin(payload: { username: string; password: string
   });
   if (!res.ok) {
     throw new Error(`Request failed (${res.status})`);
+  }
+}
+
+export async function deleteQAdmin(username: string): Promise<void> {
+  const res = await fetch("/api/superadmin/qadmins", {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username }),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => "");
+    throw new Error(message || `Request failed (${res.status})`);
   }
 }

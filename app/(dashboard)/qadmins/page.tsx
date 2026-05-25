@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import TopBar from "@/components/TopBar";
-import { createQAdmin, fetchQAdmins } from "@/lib/api";
+import { createQAdmin, deleteQAdmin, fetchQAdmins } from "@/lib/api";
 import { QAdminUser } from "@/lib/types";
 
 export default function QAdminsPage() {
   const [users, setUsers] = useState<QAdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
 
@@ -34,20 +35,26 @@ export default function QAdminsPage() {
 
       <section className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         <article className="rounded-xl border border-slate-200 bg-white p-5">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">Create QAdmin</h3>
+          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">
+            Create QAdmin
+          </h3>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <input
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               placeholder="Username"
               value={form.username}
-              onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, username: e.target.value }))
+              }
             />
             <input
               type="password"
               className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
               placeholder="Password"
               value={form.password}
-              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, password: e.target.value }))
+              }
             />
             <button
               type="button"
@@ -65,7 +72,9 @@ export default function QAdminsPage() {
                   setForm({ username: "", password: "" });
                   await load();
                 } catch {
-                  setError("Failed to create qadmin. Username may already exist.");
+                  setError(
+                    "Failed to create qadmin. Username may already exist.",
+                  );
                 } finally {
                   setSaving(false);
                 }
@@ -74,19 +83,26 @@ export default function QAdminsPage() {
               {saving ? "Creating..." : "Create QAdmin"}
             </button>
           </div>
-          {error ? <p className="mt-3 text-sm font-medium text-rose-700">{error}</p> : null}
+          {error ? (
+            <p className="mt-3 text-sm font-medium text-rose-700">{error}</p>
+          ) : null}
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">Current QAdmins</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-600">
+              Current QAdmins
+            </h3>
             <p className="text-sm text-slate-500">{users.length} total</p>
           </div>
 
           {loading ? (
             <div className="animate-pulse space-y-2">
-              {[1,2,3].map(i => (
-                <div key={i} className="flex gap-6 py-3 border-b border-slate-100">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex gap-6 py-3 border-b border-slate-100"
+                >
                   <div className="h-4 w-32 bg-slate-200 rounded" />
                   <div className="h-4 w-48 bg-slate-100 rounded" />
                   <div className="h-4 w-24 bg-slate-100 rounded" />
@@ -101,18 +117,56 @@ export default function QAdminsPage() {
                     <th className="px-2 py-2">Username</th>
                     <th className="px-2 py-2">Created</th>
                     <th className="px-2 py-2">Level</th>
+                    <th className="px-2 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user) => (
                     <tr key={user.id} className="border-b border-slate-100">
-                      <td className="px-2 py-2 font-medium text-slate-900">{user.username}</td>
+                      <td className="px-2 py-2 font-medium text-slate-900">
+                        {user.username}
+                      </td>
                       <td className="px-2 py-2 text-slate-600">
                         {user.createdAt === "Bootstrap credential"
                           ? user.createdAt
                           : new Date(user.createdAt).toLocaleString("en-IN")}
                       </td>
-                      <td className="px-2 py-2 text-slate-700">Full platform access</td>
+                      <td className="px-2 py-2 text-slate-700">
+                        Full platform access
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <button
+                          type="button"
+                          className="rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={deletingId === user.id || users.length <= 1}
+                          onClick={async () => {
+                            setError("");
+                            const ok = window.confirm(
+                              `Delete ${user.username}? At least one admin must remain.`,
+                            );
+                            if (!ok) return;
+                            setDeletingId(user.id);
+                            try {
+                              await deleteQAdmin(user.username);
+                              await load();
+                            } catch (err) {
+                              const message =
+                                err instanceof Error
+                                  ? err.message
+                                  : "Failed to delete qadmin.";
+                              setError(
+                                message.includes("At least one admin")
+                                  ? message
+                                  : "Failed to delete qadmin.",
+                              );
+                            } finally {
+                              setDeletingId("");
+                            }
+                          }}
+                        >
+                          {deletingId === user.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

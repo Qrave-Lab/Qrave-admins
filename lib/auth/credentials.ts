@@ -54,3 +54,12 @@ export function listBootstrapCredentials(): Array<{ username: string }> {
   hydrateFromEnv();
   return Array.from(credentialStore.keys()).map((username) => ({ username }));
 }
+
+export function removeSuperadminCredential(username: string): { ok: boolean; reason?: string } {
+  hydrateFromEnv();
+  const key = String(username || "").trim().toLowerCase();
+  if (!key) return { ok: false, reason: "username required" };
+  if (!credentialStore.has(key)) return { ok: false, reason: "not found" };
+  credentialStore.delete(key);
+  return { ok: true };
+}

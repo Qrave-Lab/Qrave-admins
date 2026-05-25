@@ -50,6 +50,17 @@ function mrrFromSubscriptionPlan(raw: string | null): number {
   }
 }
 
+function resolvePackageExpirySQL() {
+  return `
+    CASE
+      WHEN rest.subscription_status = 'trialing' THEN COALESCE(rest.trial_ends_at, rest.current_period_end, rest.grace_ends_at)
+      WHEN rest.subscription_status IN ('active', 'past_due', 'halted') THEN COALESCE(rest.current_period_end, rest.grace_ends_at, rest.trial_ends_at)
+      WHEN rest.subscription_status IN ('expired', 'canceled') THEN COALESCE(rest.grace_ends_at, rest.current_period_end, rest.trial_ends_at)
+      ELSE COALESCE(rest.current_period_end, rest.trial_ends_at, rest.grace_ends_at)
+    END
+  `;
+}
+
 export { resolveRange };
 
 /* ── list restaurants ── */
@@ -63,6 +74,7 @@ export async function listRestaurants(rangeDays: number) {
       COALESCE(owner.email,  '')         AS owner_email,
       rest.subscription_plan,
       COALESCE(rest.subscription_status, 'trialing') AS subscription_status,
+      to_char(${resolvePackageExpirySQL()}, 'YYYY-MM-DD"T"HH24:MI:SS') AS package_expires_at,
       COALESCE(ctrl.status,
         CASE
           WHEN rest.subscription_status='trialing' THEN 'trial'
@@ -124,6 +136,7 @@ export async function listRestaurants(rangeDays: number) {
       createdAt: r.created_at,
       totalRevenueRange: Number(r.range_revenue),
       memberSince: r.created_at,
+      packageExpiresAt: r.package_expires_at,
     };
   });
 }
@@ -237,6 +250,7 @@ export async function getRestaurantDetail(restaurantId: string, rangeRaw: string
   `, [restaurantId]);
 
   const series = await listRevenueSeries(days, bucket, restaurantId);
+  const paymentHistory = await listPaymentHistory(restaurantId);
 
   return {
     restaurant: selected,
@@ -244,7 +258,46 @@ export async function getRestaurantDetail(restaurantId: string, rangeRaw: string
     totalOrdersLifetime: Number(lifetimeRes.rows[0]?.orders || 0),
     range: label,
     revenueSeries: series,
+    paymentHistory,
   };
+}
+
+export async function listPaymentHistory(restaurantId: string) {
+  const { rows } = await db.query(`
+    SELECT
+      pse.id,
+      pse.order_id,
+      pse.takeaway_order_id,
+      CASE WHEN pse.order_id IS NOT NULL THEN 'order' ELSE 'takeaway' END AS payment_type,
+      pse.old_status,
+      pse.new_status,
+      pse.payment_mode,
+      pse.amount::float8 AS amount,
+      COALESCE(pse.reason, '') AS reason,
+      COALESCE(u.name, u.email, pse.actor_role, 'system') AS actor_name,
+      COALESCE(pse.actor_role, '') AS actor_role,
+      to_char(pse.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+    FROM payment_status_events pse
+    LEFT JOIN users u ON u.id = pse.actor_user_id
+    WHERE pse.restaurant_id = $1
+    ORDER BY pse.created_at DESC
+    LIMIT 500
+  `, [restaurantId]);
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    orderId: row.order_id,
+    takeawayOrderId: row.takeaway_order_id,
+    paymentType: row.payment_type,
+    oldStatus: row.old_status,
+    newStatus: row.new_status,
+    paymentMode: row.payment_mode,
+    amount: row.amount === null ? null : Number(row.amount),
+    reason: row.reason || null,
+    actorName: row.actor_name,
+    actorRole: row.actor_role || null,
+    createdAt: row.created_at,
+  }));
 }
 
 /* ── restaurant users ── */

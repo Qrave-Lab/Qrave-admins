@@ -16,6 +16,7 @@ export type RestaurantSummary = {
   createdAt: string;
   totalRevenueRange: number;
   memberSince: string;
+  packageExpiresAt: string | null;
 };
 
 export type RevenueRange = "week" | "month" | "year";
@@ -37,6 +38,21 @@ export type RevenuePoint = {
   orders: number;
 };
 
+export type PaymentHistoryRecord = {
+  id: string;
+  orderId: string | null;
+  takeawayOrderId: string | null;
+  paymentType: "order" | "takeaway";
+  oldStatus: string;
+  newStatus: string;
+  paymentMode: string | null;
+  amount: number | null;
+  reason: string | null;
+  actorName: string;
+  actorRole: string | null;
+  createdAt: string;
+};
+
 export type AnalyticsTopItem = {
   name: string;
   orders: number;
@@ -49,6 +65,7 @@ export type RestaurantDetail = {
   totalOrdersLifetime: number;
   range: RevenueRange;
   revenueSeries: RevenuePoint[];
+  paymentHistory: PaymentHistoryRecord[];
 };
 
 export type RestaurantUser = {

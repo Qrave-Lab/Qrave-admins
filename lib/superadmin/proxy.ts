@@ -11,7 +11,9 @@ export async function proxyToBackend(options: ProxyOptions): Promise<Response> {
   const unauthorized = await requireAuthJson();
   if (unauthorized) return unauthorized;
 
-  const baseURL = String(process.env.SUPERADMIN_BACKEND_URL || "").trim();
+  const baseURL = String(
+    process.env.NEXT_PUBLIC_SUPERADMIN_API_URL || process.env.SUPERADMIN_BACKEND_URL || "",
+  ).trim();
   const apiKey = String(process.env.SUPERADMIN_API_KEY || "").trim();
   if (!baseURL || !apiKey) {
     return NextResponse.json(
@@ -29,6 +31,12 @@ export async function proxyToBackend(options: ProxyOptions): Promise<Response> {
     accept: "application/json",
   };
   if (sessionEmail) headers["x-superadmin-actor"] = sessionEmail;
+
+  const forwardedCookie = options.request.headers.get("cookie");
+  if (forwardedCookie) headers.cookie = forwardedCookie;
+
+  const csrfHeader = options.request.headers.get("x-csrf-token");
+  if (csrfHeader) headers["x-csrf-token"] = csrfHeader;
 
   let body: string | undefined;
   if (method !== "GET" && method !== "DELETE") {
