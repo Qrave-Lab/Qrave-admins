@@ -393,12 +393,6 @@ export async function updateStaffFeedback(id: string, status: string, response: 
     }
 
     await db.query(`
-        ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_response TEXT;
-        ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_responded_at TIMESTAMP;
-        ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_responded_by TEXT;
-    `);
-
-    await db.query(`
         UPDATE staff_feedback 
         SET status = $1, 
             admin_response = $2,
@@ -696,6 +690,12 @@ export async function listQAdminUsers() {
       username,
       to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
     FROM superadmin_users
+    UNION ALL
+    SELECT
+      id,
+      email AS username,
+      to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+    FROM qrave_admins
     ORDER BY created_at DESC
   `);
 

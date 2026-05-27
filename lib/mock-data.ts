@@ -44,6 +44,7 @@ const seeds: RestaurantSeed[] = [
     memberSince: "2025-06-05",
     baseRevenue: 52000,
     volatility: 0.18,
+    packageExpiresAt: null,
   },
   {
     id: "r2",
@@ -57,6 +58,7 @@ const seeds: RestaurantSeed[] = [
     memberSince: "2025-08-12",
     baseRevenue: 46000,
     volatility: 0.2,
+    packageExpiresAt: null,
   },
   {
     id: "r3",
@@ -70,6 +72,7 @@ const seeds: RestaurantSeed[] = [
     memberSince: "2026-01-02",
     baseRevenue: 18000,
     volatility: 0.25,
+    packageExpiresAt: null,
   },
   {
     id: "r4",
@@ -83,6 +86,7 @@ const seeds: RestaurantSeed[] = [
     memberSince: "2025-05-21",
     baseRevenue: 15000,
     volatility: 0.35,
+    packageExpiresAt: null,
   },
   {
     id: "r5",
@@ -96,6 +100,7 @@ const seeds: RestaurantSeed[] = [
     memberSince: "2025-03-09",
     baseRevenue: 61000,
     volatility: 0.14,
+    packageExpiresAt: null,
   },
 ];
 
@@ -298,6 +303,7 @@ export function getRestaurants(range: RevenueRange): RestaurantSummary[] {
       todayRevenue: totals.todayRevenue,
       ordersToday: totals.ordersToday,
       totalRevenueRange: totals.totalRevenueRange,
+      packageExpiresAt: seed.packageExpiresAt,
     };
   });
 }
@@ -343,6 +349,7 @@ export function getRestaurantDetail(id: string, range: RevenueRange): Restaurant
     totalOrdersLifetime: fullSeries.reduce((sum, p) => sum + p.orders, 0),
     range,
     revenueSeries,
+    paymentHistory: [],
   };
 }
 

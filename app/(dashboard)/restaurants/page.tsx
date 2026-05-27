@@ -86,7 +86,8 @@ export default function RestaurantsPage() {
           type: "group";
           ownerEmail: string;
           brandName: string;
-          items: RestaurantSummary[];
+          mainBranch: RestaurantSummary;
+          subBranches: RestaurantSummary[];
         }
     )[] = [];
     const singles: RestaurantSummary[] = [];
