@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
+import { verifyToken } from "./token";
 
 export const SESSION_COOKIE = "qrave_sa_session";
 
@@ -15,7 +16,8 @@ async function decodeSession(): Promise<SessionUser | null> {
   if (!token) return null;
 
   try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8");
+    const decoded = verifyToken(token);
+    if (!decoded) return null;
     const [id, username] = decoded.split(":");
     if (!id || !username) return null;
     return { id, username };

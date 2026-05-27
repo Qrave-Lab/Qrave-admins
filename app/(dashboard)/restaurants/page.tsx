@@ -65,7 +65,7 @@ export default function RestaurantsPage() {
 
   const grouped = useMemo(() => {
     const map = new Map<string, RestaurantSummary[]>();
-    const result: (RestaurantSummary | { type: 'group', ownerEmail: string, brandName: string, items: RestaurantSummary[] })[] = [];
+    const result: (RestaurantSummary | { type: 'group', ownerEmail: string, brandName: string, mainBranch: RestaurantSummary, subBranches: RestaurantSummary[] })[] = [];
     const singles: RestaurantSummary[] = [];
 
     filtered.forEach((r) => {

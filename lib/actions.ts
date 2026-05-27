@@ -13,16 +13,22 @@ async function assertQAdminSession() {
 
 export async function deleteRestaurant(restaurantId: string) {
   await assertQAdminSession();
+  const client = await db.connect();
   try {
-    await db.query("DELETE FROM restaurant_users WHERE restaurant_id = $1", [restaurantId]);
-    await db.query("DELETE FROM menu_items WHERE restaurant_id = $1", [restaurantId]);
-    await db.query("DELETE FROM menu_categories WHERE restaurant_id = $1", [restaurantId]);
-    await db.query("DELETE FROM restaurants WHERE id = $1", [restaurantId]);
+    await client.query("BEGIN");
+    await client.query("DELETE FROM restaurant_users WHERE restaurant_id = $1", [restaurantId]);
+    await client.query("DELETE FROM menu_items WHERE restaurant_id = $1", [restaurantId]);
+    await client.query("DELETE FROM menu_categories WHERE restaurant_id = $1", [restaurantId]);
+    await client.query("DELETE FROM restaurants WHERE id = $1", [restaurantId]);
+    await client.query("COMMIT");
     revalidatePath("/restaurants");
     return { success: true };
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Failed to delete restaurant:", error);
     return { success: false, error: "Failed to delete restaurant" };
+  } finally {
+    client.release();
   }
 }
 
@@ -94,6 +100,7 @@ export async function deleteMenuItem(itemId: string) {
 
 export async function addStaff(restaurantId: string, data: any) {
     await assertQAdminSession();
+    const client = await db.connect();
     try {
         const { email, name, phone, role } = data;
         const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -105,39 +112,48 @@ export async function addStaff(restaurantId: string, data: any) {
             return { success: false, error: "Name, email, and role are required" };
         }
         
+        await client.query("BEGIN");
+        
         let userId;
-        const userRes = await db.query("SELECT id FROM users WHERE lower(email) = $1", [normalizedEmail]);
+        const userRes = await client.query("SELECT id FROM users WHERE lower(email) = $1", [normalizedEmail]);
         if ((userRes.rowCount || 0) > 0) {
             userId = userRes.rows[0].id;
         } else {
-             const newUser = await db.query(
+             const newUser = await client.query(
                 "INSERT INTO users (email, name, phone) VALUES ($1, $2, $3) RETURNING id",
                 [normalizedEmail, normalizedName, normalizedPhone || null]
             );
              userId = newUser.rows[0].id;
         }
 
-        const existing = await db.query(
+        const existing = await client.query(
             "SELECT 1 FROM restaurant_users WHERE restaurant_id = $1 AND user_id = $2",
             [restaurantId, userId]
         );
         if ((existing.rowCount || 0) > 0) {
+            await client.query("ROLLBACK");
             return { success: false, error: "This user is already assigned to the restaurant" };
         }
 
-        await db.query("INSERT INTO restaurant_users (restaurant_id, user_id, role) VALUES ($1, $2, $3)", [restaurantId, userId, normalizedRole]);
+        await client.query("INSERT INTO restaurant_users (restaurant_id, user_id, role) VALUES ($1, $2, $3)", [restaurantId, userId, normalizedRole]);
+        
+        await client.query("COMMIT");
+        
         revalidatePath(`/staff?restaurantId=${restaurantId}`);
         return { success: true };
 
     } catch (error: any) {
+         await client.query("ROLLBACK");
          console.error("Failed to add staff:", error);
-        if (error?.code === "23514") {
-            return { success: false, error: "Selected role is not supported by the database" };
-        }
-        if (error?.code === "23505") {
-            return { success: false, error: "This email is already in use" };
-        }
-        return { success: false, error: "Failed to add staff" };
+         if (error?.code === "23514") {
+             return { success: false, error: "Selected role is not supported by the database" };
+         }
+         if (error?.code === "23505") {
+             return { success: false, error: "This email is already in use" };
+         }
+         return { success: false, error: "Failed to add staff" };
+    } finally {
+         client.release();
     }
 }
 
