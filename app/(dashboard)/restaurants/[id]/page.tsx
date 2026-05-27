@@ -8,6 +8,7 @@ import RangeTabs from "@/components/RangeTabs";
 import RevenueChart from "@/components/RevenueChart";
 import PackageExpiryBadge from "@/components/PackageExpiryBadge";
 import TopBar from "@/components/TopBar";
+import { X } from "lucide-react";
 import {
   fetchRestaurantDetail,
   fetchRestaurantDowntimes,
@@ -17,6 +18,7 @@ import {
   updateStaffFeedback,
   updateRestaurantStatus,
   updateRestaurantUserStatus,
+  updateRestaurantBilling,
 } from "@/lib/api";
 import {
   DowntimeItem,
@@ -46,6 +48,10 @@ export default function RestaurantDetailPage() {
   const [responseNote, setResponseNote] = useState("");
   const [newStatus, setNewStatus] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Billing and Invoice Actions
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [billingBusy, setBillingBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -122,6 +128,45 @@ export default function RestaurantDetailPage() {
       alert("Failed to update user status");
     } finally {
       setPending("");
+    }
+  };
+
+  const handleUpdatePlan = async (newPlan: string) => {
+    if (!detail) return;
+    const oldPlan = detail.restaurant.plan;
+    setBillingBusy(true);
+    setDetail({
+      ...detail,
+      restaurant: { ...detail.restaurant, plan: newPlan as any }
+    });
+
+    try {
+      await updateRestaurantBilling(id, { action: "update_plan", plan: newPlan });
+    } catch {
+      setDetail({
+        ...detail,
+        restaurant: { ...detail.restaurant, plan: oldPlan }
+      });
+      alert("Failed to update subscription plan");
+    } finally {
+      setBillingBusy(false);
+    }
+  };
+
+  const handleExtendTrial = async () => {
+    if (!detail) return;
+    setBillingBusy(true);
+    try {
+      const res = await updateRestaurantBilling(id, { action: "extend_trial" });
+      setDetail({
+        ...detail,
+        restaurant: { ...detail.restaurant, packageExpiresAt: res.newExpiry }
+      });
+      alert("Successfully granted 7-day extension!");
+    } catch {
+      alert("Failed to extend trial period");
+    } finally {
+      setBillingBusy(false);
     }
   };
 
@@ -300,23 +345,60 @@ export default function RestaurantDetailPage() {
           </p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md sm:col-span-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Billing Summary
-          </p>
-          <p className="mt-2 text-sm text-gray-600">
-            Current status:{" "}
-            <span className="font-semibold text-gray-900 capitalize">
-              {restaurant.billingStatus || restaurant.status}
-            </span>
-          </p>
-          <p className="mt-1 text-sm text-gray-600">
-            Package timer:{" "}
-            <span className="font-semibold text-gray-900">
-              {restaurant.packageExpiresAt
-                ? new Date(restaurant.packageExpiresAt).toLocaleString("en-IN")
-                : "Not available"}
-            </span>
-          </p>
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Subscription & Billing Control Hub
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Status:{" "}
+                <span className="font-bold text-slate-900 capitalize bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  {restaurant.billingStatus || restaurant.status}
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Package Expiry:{" "}
+                <span className="font-semibold text-slate-900 font-mono">
+                  {restaurant.packageExpiresAt
+                    ? new Date(restaurant.packageExpiresAt).toLocaleString("en-IN")
+                    : "Not configured"}
+                </span>
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Plan Update Dropdown */}
+              <div className="relative">
+                <select
+                  value={restaurant.plan}
+                  disabled={billingBusy}
+                  onChange={(e) => void handleUpdatePlan(e.target.value)}
+                  className="rounded-lg border border-slate-350 bg-white py-1.5 pl-3 pr-8 text-xs font-semibold cursor-pointer outline-none focus:border-slate-500"
+                >
+                  <option value="starter">Starter (₹499)</option>
+                  <option value="growth">Growth (₹999)</option>
+                  <option value="pro">Pro (₹1499)</option>
+                </select>
+              </div>
+
+              {/* 7-Day Extension Button */}
+              <button
+                disabled={billingBusy}
+                onClick={() => void handleExtendTrial()}
+                className="rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 text-xs font-bold transition shadow-sm"
+              >
+                +7 Days
+              </button>
+
+              {/* Mock Invoice Generator Button */}
+              <button
+                onClick={() => setInvoiceOpen(true)}
+                className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
+              >
+                Invoice Statement
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -990,6 +1072,129 @@ export default function RestaurantDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Printable Invoice Modal */}
+      {invoiceOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 overflow-y-auto h-full w-full flex items-center justify-center z-50 backdrop-blur-sm print:absolute print:inset-0 print:bg-white print:p-0">
+          <div className="relative mx-auto p-8 border w-[700px] shadow-2xl rounded-2xl bg-white print:border-none print:shadow-none print:w-full print:p-0">
+            {/* Modal Header (Hidden on print) */}
+            <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 print:hidden">
+              <h3 className="text-lg font-bold text-slate-900">Restaurant Billing Statement</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                >
+                  Print / Save PDF
+                </button>
+                <button
+                  onClick={() => setInvoiceOpen(false)}
+                  className="text-slate-400 bg-transparent hover:bg-slate-100 hover:text-slate-950 rounded-lg text-sm p-1.5 inline-flex items-center"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Invoice Body */}
+            <div className="space-y-6 text-slate-800">
+              {/* Brand & Invoice Info */}
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded bg-slate-950 text-white flex items-center justify-center font-bold text-sm">Q</div>
+                    <span className="text-lg font-black tracking-tight text-slate-950">QRAVE PLATFORMS</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">122, Infopark Road, Phase II, Kochi, KL - 682030</p>
+                  <p className="text-xs text-slate-500">GSTIN: 32AAAAA1111A1Z1</p>
+                </div>
+                <div className="text-right">
+                  <h2 className="text-2xl font-black tracking-tight text-slate-950">INVOICE</h2>
+                  <p className="text-xs text-slate-500 font-mono mt-1">#INV-2026-{restaurant.id.slice(0, 8).toUpperCase()}</p>
+                  <p className="text-xs text-slate-600 mt-2">Date: {new Date().toLocaleDateString("en-IN")}</p>
+                </div>
+              </div>
+
+              <hr className="border-slate-150" />
+
+              {/* Bill To & Bill From */}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="font-bold text-slate-500 uppercase tracking-wider mb-2">BILL TO</p>
+                  <p className="text-sm font-bold text-slate-900">{restaurant.brandName}</p>
+                  <p className="text-slate-600 mt-1">{restaurant.locationName}</p>
+                  <p className="text-slate-600">{restaurant.ownerEmail || "owner@qrave.in"}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-slate-500 uppercase tracking-wider mb-2 font-mono">PAYMENT TERMS</p>
+                  <p className="text-slate-700">Plan: <span className="font-bold capitalize">{restaurant.plan}</span></p>
+                  <p className="text-slate-700 mt-1">Status: <span className="font-bold capitalize text-emerald-600">{restaurant.billingStatus || "Active"}</span></p>
+                </div>
+              </div>
+
+              {/* Invoice Table */}
+              <div className="overflow-x-auto border border-slate-200 rounded-xl mt-4">
+                <table className="min-w-full divide-y divide-slate-200 text-xs">
+                  <thead className="bg-slate-50">
+                    <tr className="text-left font-bold uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3">Description</th>
+                      <th className="px-4 py-3 text-right">Plan Rate</th>
+                      <th className="px-4 py-3 text-right font-mono">Billing Cycle</th>
+                      <th className="px-4 py-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    <tr>
+                      <td className="px-4 py-4">
+                        <p className="font-bold text-slate-900">Qrave POS Platform Subscription</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Full cloud-based access control, analytics dashboard, and digital menu rendering.</p>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        ₹{restaurant.plan === "starter" ? "499" : restaurant.plan === "growth" ? "999" : "1,499"}
+                      </td>
+                      <td className="px-4 py-4 text-right font-mono">Monthly</td>
+                      <td className="px-4 py-4 text-right font-semibold text-slate-900">
+                        ₹{restaurant.plan === "starter" ? "499" : restaurant.plan === "growth" ? "999" : "1,499"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals Summary */}
+              <div className="flex justify-end mt-4">
+                <div className="w-64 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal</span>
+                    <span className="font-semibold">
+                      ₹{restaurant.plan === "starter" ? "499" : restaurant.plan === "growth" ? "999" : "1,499"}.00
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Integrated GST (18%)</span>
+                    <span className="font-semibold">
+                      ₹{restaurant.plan === "starter" ? "89.82" : restaurant.plan === "growth" ? "179.82" : "269.82"}
+                    </span>
+                  </div>
+                  <hr className="border-slate-150" />
+                  <div className="flex justify-between text-slate-900 text-sm font-black">
+                    <span>Grand Total Due</span>
+                    <span>
+                      ₹{restaurant.plan === "starter" ? "588.82" : restaurant.plan === "growth" ? "1178.82" : "1768.82"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Note */}
+              <div className="text-center pt-8 border-t border-slate-100 text-[10px] text-slate-400">
+                <p>Thank you for partnering with QRAVE. For any support inquiries, contact operations@qrave.in.</p>
+                <p className="mt-1 font-mono">System Generated Electronic Document • No signature required.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

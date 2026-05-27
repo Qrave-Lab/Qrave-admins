@@ -1,9 +1,10 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import { listBootstrapCredentials, removeSuperadminCredential } from "@/lib/auth/credentials";
 import { listQAdminUsers } from "@/lib/superadmin/queries";
+import { logAuditEvent } from "@/lib/superadmin/audit";
 
 export async function GET() {
   const unauthorized = await requireAuthJson();
@@ -52,6 +53,9 @@ export async function POST(request: Request) {
       [username, hashedPassword],
     );
 
+    const actor = (await requireSessionEmail()) || "superadmin";
+    await logAuditEvent(actor, "CREATE_QADMIN", username, "qadmin");
+
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err: any) {
     if (err?.code === "23505") {
@@ -73,6 +77,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "username required" }, { status: 400 });
     }
 
+    const actor = (await requireSessionEmail()) || "superadmin";
+
     // Count total admins (DB + bootstrap)
     const bs = listBootstrapCredentials().map((b) => b.username);
     const countRes = await db.query("SELECT COUNT(*) AS cnt FROM superadmin_users");
@@ -91,13 +97,17 @@ export async function DELETE(request: Request) {
     );
     if (rows.length > 0) {
       await db.query("DELETE FROM superadmin_users WHERE id = $1", [rows[0].id]);
+      await logAuditEvent(actor, "DELETE_QADMIN", username, "qadmin");
       return NextResponse.json({ ok: true });
     }
 
     // Fallback to bootstrap removal
     if (bs.includes(username)) {
       const removed = removeSuperadminCredential(username);
-      if (removed.ok) return NextResponse.json({ ok: true });
+      if (removed.ok) {
+        await logAuditEvent(actor, "DELETE_QADMIN", username, "qadmin", { bootstrap: true });
+        return NextResponse.json({ ok: true });
+      }
       return NextResponse.json({ error: removed.reason || "failed to remove bootstrap" }, { status: 500 });
     }
 

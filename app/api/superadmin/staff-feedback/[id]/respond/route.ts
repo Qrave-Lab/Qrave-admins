@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import { updateStaffFeedback } from "@/lib/superadmin/queries";
+import { logAuditEvent } from "@/lib/superadmin/audit";
 
 export async function POST(
   request: Request,
@@ -27,6 +28,9 @@ export async function POST(
 
     const actor = (await requireSessionEmail()) || "qadmin";
     await updateStaffFeedback(id, status, response || "", actor); 
+
+    // Log audit event
+    await logAuditEvent(actor, "RESPOND_TO_TICKET", id, "ticket", { status, response });
 
     return NextResponse.json({ success: true });
   } catch (err) {

@@ -20,6 +20,8 @@ import {
   Menu,
   X,
   Mail,
+  FileClock,
+  Cpu,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -35,6 +37,8 @@ const links = [
   { href: "/owner-mail", label: "Owner Mail", icon: Mail },
   { href: "/logs", label: "Logs & Support", icon: FileText },
   { href: "/qadmins", label: "QAdmin Access", icon: ShieldCheck },
+  { href: "/audit-logs", label: "Audit Logs", icon: FileClock },
+  { href: "/system", label: "System Control", icon: Cpu },
 ];
 
 export default function Sidebar() {

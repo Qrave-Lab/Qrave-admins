@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
 import { fetchOperations } from "@/lib/api";
 import { PlatformOperations } from "@/lib/types";
+import { Download } from "lucide-react";
 
 const tabs = [
   { id: "payments", label: "Payments" },
@@ -89,6 +90,57 @@ export default function OperationsPage() {
       ),
     };
   }, [data, query]);
+
+  const handleExportCSV = () => {
+    if (!filtered) return;
+
+    let headers: string[] = [];
+    let rows: any[][] = [];
+    const filename = `qrave_operations_${activeTab}.csv`;
+
+    switch (activeTab) {
+      case "payments":
+        headers = ["Payment ID", "Restaurant", "Order ID", "Mode", "Status", "Amount", "Created At"];
+        rows = filtered.payments.map((r) => [r.id, r.restaurantName, r.orderId, r.mode, r.status, r.amount, r.createdAt]);
+        break;
+      case "orders":
+        headers = ["Order ID", "Restaurant", "Session ID", "Status", "Total Items", "Subtotal", "Created At"];
+        rows = filtered.orders.map((r) => [r.id, r.restaurantName, r.sessionId, r.status, r.totalItems, r.subtotal, r.createdAt]);
+        break;
+      case "takeaway":
+        headers = ["Order ID", "Restaurant", "Type", "Customer", "Status", "Payment Mode", "Total"];
+        rows = filtered.takeawayOrders.map((r) => [r.id, r.restaurantName, r.orderType, r.customerName, r.status, r.paymentMode, r.total]);
+        break;
+      case "tickets":
+        headers = ["Ticket ID", "Restaurant", "Title", "Type", "Priority", "Status", "Reporter", "Admin Response"];
+        rows = filtered.tickets.map((r) => [r.id, r.restaurantName, r.title, r.type, r.priority, r.status, r.userName, r.adminResponse]);
+        break;
+      case "downtime":
+        headers = ["Log ID", "Restaurant", "Reason", "Severity", "Minutes", "Started", "Ended"];
+        rows = filtered.downtime.map((r) => [r.id, r.restaurantName, r.reason, r.severity, r.minutes, r.startedAt, r.endedAt]);
+        break;
+      case "discounts":
+        headers = ["Campaign ID", "Restaurant", "Name", "Coupon Code"];
+        rows = filtered.coupons.map((r) => [r.id, r.restaurantName, r.name, r.couponCode]);
+        break;
+    }
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [
+        headers.join(","),
+        ...rows.map((row) =>
+          row.map((val) => `"${String(val || "").replace(/"/g, '""')}"`).join(",")
+        ),
+      ].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (loading || !filtered) {
     return (
@@ -187,12 +239,21 @@ export default function OperationsPage() {
                 </button>
               ))}
             </div>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm lg:max-w-sm"
-              placeholder="Search active table"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <div className="flex gap-2 w-full lg:max-w-md shrink-0">
+              <input
+                className="w-full flex-grow rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                placeholder="Search active table..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <button
+                onClick={handleExportCSV}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 text-xs font-bold transition shadow-sm shrink-0"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export CSV
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 overflow-x-auto">

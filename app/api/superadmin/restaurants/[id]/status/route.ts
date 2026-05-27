@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
 import { setRestaurantStatus } from "@/lib/superadmin/queries";
+import { logAuditEvent } from "@/lib/superadmin/audit";
 
 export async function PATCH(
   request: Request,
@@ -20,6 +21,10 @@ export async function PATCH(
     }
     const actor = (await requireSessionEmail()) || "superadmin";
     await setRestaurantStatus(id, status, reason, actor);
+    
+    // Log audit event
+    await logAuditEvent(actor, "UPDATE_RESTAURANT_STATUS", id, "restaurant", { status, reason });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("set status error:", err);

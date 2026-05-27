@@ -231,6 +231,16 @@ export type QAdminUser = {
   createdAt: string;
 };
 
+export type AuditLogRecord = {
+  id: string;
+  actorEmail: string;
+  action: string;
+  targetId: string | null;
+  targetType: string | null;
+  metadata: any;
+  createdAt: string;
+};
+
 export type PlatformOperations = {
   summary: {
     restaurantCount: number;

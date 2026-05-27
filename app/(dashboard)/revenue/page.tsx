@@ -7,6 +7,7 @@ import RevenueChart from "@/components/RevenueChart";
 import TopBar from "@/components/TopBar";
 import { fetchRevenueSeries } from "@/lib/api";
 import { RevenuePoint, RevenueRange } from "@/lib/types";
+import { Download } from "lucide-react";
 
 export default function RevenuePage() {
   const [range, setRange] = useState<RevenueRange>("month");
@@ -18,6 +19,22 @@ export default function RevenuePage() {
 
   const totalRevenue = useMemo(() => series.reduce((sum, p) => sum + p.revenue, 0), [series]);
   const totalOrders = useMemo(() => series.reduce((sum, p) => sum + p.orders, 0), [series]);
+
+  const downloadCSV = () => {
+    if (!series.length) return;
+    const headers = ["Date", "Revenue", "Orders"];
+    const rows = series.map((p) => [p.date, p.revenue, p.orders]);
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `qrave_revenue_${range}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-12">
@@ -32,7 +49,18 @@ export default function RevenuePage() {
             Total revenue and order volume from all restaurants
           </div>
         }
-        rightSlot={<RangeTabs value={range} onChange={setRange} />}
+        rightSlot={
+          <div className="flex items-center gap-3">
+            <RangeTabs value={range} onChange={setRange} />
+            <button
+              onClick={downloadCSV}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 px-3.5 py-2 text-xs font-bold transition shadow-sm"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export CSV
+            </button>
+          </div>
+        }
       />
 
       {/* KPI Cards */}

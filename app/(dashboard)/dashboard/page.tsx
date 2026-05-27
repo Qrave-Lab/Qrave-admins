@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import RangeTabs from "@/components/RangeTabs";
+import PackageExpiryBadge from "@/components/PackageExpiryBadge";
 import TopBar from "@/components/TopBar";
 import { fetchOverview, fetchRestaurants } from "@/lib/api";
 import { Overview, RestaurantSummary, RevenueRange } from "@/lib/types";
