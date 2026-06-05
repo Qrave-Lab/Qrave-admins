@@ -337,6 +337,46 @@ export async function setRestaurantStatus(restaurantId: string, status: string, 
   `, [restaurantId, status, reason, updatedBy]);
 }
 
+export async function extendRestaurantSubscriptionDays(restaurantId: string, extraDays: number) {
+  const days = Math.trunc(Number(extraDays));
+  if (!Number.isFinite(days) || days < 1 || days > 3650) {
+    throw new Error("invalid extraDays");
+  }
+
+  const { rows } = await db.query(`
+    UPDATE restaurants AS rest
+    SET
+      trial_ends_at = CASE
+        WHEN rest.subscription_status = 'trialing'
+          THEN GREATEST(COALESCE(rest.trial_ends_at, NOW()), NOW()) + make_interval(days => $2)
+        ELSE rest.trial_ends_at
+      END,
+      current_period_end = CASE
+        WHEN rest.subscription_status IN ('active', 'past_due', 'halted')
+          THEN GREATEST(COALESCE(rest.current_period_end, NOW()), NOW()) + make_interval(days => $2)
+        WHEN rest.subscription_status NOT IN ('trialing', 'expired', 'canceled')
+          AND rest.trial_ends_at IS NULL
+          AND rest.grace_ends_at IS NULL
+          THEN GREATEST(COALESCE(rest.current_period_end, NOW()), NOW()) + make_interval(days => $2)
+        ELSE rest.current_period_end
+      END,
+      grace_ends_at = CASE
+        WHEN rest.subscription_status IN ('expired', 'canceled')
+          THEN GREATEST(COALESCE(rest.grace_ends_at, NOW()), NOW()) + make_interval(days => $2)
+        ELSE rest.grace_ends_at
+      END,
+      billing_updated_at = NOW()
+    WHERE rest.id = $1
+    RETURNING to_char(${resolvePackageExpirySQL()}, 'YYYY-MM-DD"T"HH24:MI:SS') AS package_expires_at
+  `, [restaurantId, days]);
+
+  if (rows.length === 0) return null;
+
+  return {
+    packageExpiresAt: rows[0].package_expires_at as string | null,
+  };
+}
+
 /* ── set user status ── */
 
 export async function setRestaurantUserStatus(restaurantId: string, userId: string, status: string, reason: string, updatedBy: string) {
@@ -457,6 +497,9 @@ export async function listCouponCampaigns() {
       oc.id,
       oc.name,
       COALESCE(oc.coupon_code, '') AS coupon_code,
+      COALESCE(oc.discount_kind, '') AS discount_kind,
+      COALESCE(oc.discount_value, 0)::float8 AS discount_value,
+      COALESCE(oc.is_active, TRUE) AS is_active,
       oc.restaurant_id,
       COALESCE(r.name, '') AS restaurant_name
     FROM offer_campaigns oc
@@ -468,9 +511,78 @@ export async function listCouponCampaigns() {
     id: r.id,
     name: r.name,
     couponCode: r.coupon_code,
+    discountKind: r.discount_kind,
+    discountValue: Number(r.discount_value || 0),
+    isActive: Boolean(r.is_active),
     restaurantID: r.restaurant_id,
     restaurantName: r.restaurant_name,
   }));
+}
+
+export async function createCouponCampaign(input: {
+  restaurantId: string;
+  name: string;
+  couponCode: string;
+  discountKind: "percent" | "fixed" | "fixed_price";
+  discountValue: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  maxRedemptions?: number | null;
+}) {
+  const code = input.couponCode.trim();
+  const name = input.name.trim();
+  const discountValue = Number(input.discountValue);
+  const maxRedemptions = input.maxRedemptions == null ? null : Math.trunc(Number(input.maxRedemptions));
+  const restaurantRes = await db.query(`SELECT name FROM restaurants WHERE id = $1`, [input.restaurantId]);
+
+  if (!name) throw new Error("coupon name required");
+  if (!code) throw new Error("coupon code required");
+  if (!Number.isFinite(discountValue) || discountValue <= 0) throw new Error("discount value must be greater than 0");
+
+  const { rows } = await db.query(`
+    INSERT INTO offer_campaigns (
+      restaurant_id,
+      name,
+      scope,
+      discount_kind,
+      discount_value,
+      requires_coupon,
+      coupon_code,
+      is_active,
+      starts_at,
+      ends_at,
+      max_redemptions,
+      updated_at
+    ) VALUES ($1, $2, 'full_menu', $3, $4, TRUE, $5, TRUE, $6, $7, $8, NOW())
+    RETURNING
+      id,
+      name,
+      coupon_code,
+      discount_kind,
+      discount_value::float8 AS discount_value,
+      is_active,
+      restaurant_id
+  `, [
+    input.restaurantId,
+    name,
+    input.discountKind,
+    discountValue,
+    code,
+    input.startsAt || null,
+    input.endsAt || null,
+    maxRedemptions,
+  ]);
+
+  return {
+    id: rows[0].id,
+    name: rows[0].name,
+    couponCode: rows[0].coupon_code,
+    discountKind: rows[0].discount_kind,
+    discountValue: Number(rows[0].discount_value || 0),
+    isActive: Boolean(rows[0].is_active),
+    restaurantID: rows[0].restaurant_id,
+    restaurantName: String(restaurantRes.rows[0]?.name || ""),
+  };
 }
 
 export async function listCouponRedemptions(campaignID?: string) {

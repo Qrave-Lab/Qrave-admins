@@ -109,6 +109,9 @@ export type CouponCampaign = {
   id: string;
   name: string;
   couponCode: string;
+  discountKind?: "percent" | "fixed" | "fixed_price";
+  discountValue?: number;
+  isActive?: boolean;
   restaurantID: string;
   restaurantName: string;
 };

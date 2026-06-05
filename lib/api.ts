@@ -1,6 +1,5 @@
 import {
   AnalyticsTopItem,
-  AuditLogRecord,
   CouponCampaign,
   CouponRedemption,
   DowntimeItem,
@@ -74,11 +73,14 @@ export async function updateRestaurantStatus(id: string, status: RestaurantStatu
   await patchJSON<{ ok: boolean }>(`/api/superadmin/restaurants/${id}/status`, { status });
 }
 
-export async function updateRestaurantBilling(
+export async function extendRestaurantSubscription(
   id: string,
-  payload: { action: "update_plan" | "extend_trial"; plan?: string }
-): Promise<any> {
-  return patchJSON<any>(`/api/superadmin/restaurants/${id}/billing`, payload);
+  extraDays: number,
+): Promise<{ packageExpiresAt: string | null }> {
+  return patchJSON<{ ok: boolean; packageExpiresAt: string | null }>(
+    `/api/superadmin/restaurants/${id}/subscription/extend`,
+    { extraDays },
+  ).then((res) => ({ packageExpiresAt: res.packageExpiresAt }));
 }
 
 export async function fetchRestaurantUsers(id: string): Promise<RestaurantUser[]> {
@@ -185,6 +187,28 @@ export async function fetchCouponCampaigns(): Promise<CouponCampaign[]> {
   return getJSON<CouponCampaign[]>("/api/superadmin/coupons");
 }
 
+export async function createCouponCampaign(payload: {
+  restaurantId: string;
+  name: string;
+  couponCode: string;
+  discountKind: "percent" | "fixed" | "fixed_price";
+  discountValue: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  maxRedemptions?: number | null;
+}): Promise<CouponCampaign> {
+  const res = await fetch("/api/superadmin/coupons", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return (await res.json()) as CouponCampaign;
+}
+
 export async function fetchCouponRedemptions(campaignId?: string): Promise<CouponRedemption[]> {
   const q = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : "";
   return getJSON<CouponRedemption[]>(`/api/superadmin/coupon-redemptions${q}`);
@@ -224,56 +248,5 @@ export async function deleteQAdmin(username: string): Promise<void> {
   if (!res.ok) {
     const message = await res.text().catch(() => "");
     throw new Error(message || `Request failed (${res.status})`);
-  }
-}
-
-export async function fetchAuditLogs(search = "", action = ""): Promise<AuditLogRecord[]> {
-  const searchQ = search ? `&search=${encodeURIComponent(search)}` : "";
-  const actionQ = action ? `&action=${encodeURIComponent(action)}` : "";
-  return getJSON<AuditLogRecord[]>(`/api/superadmin/audit-logs?${searchQ}${actionQ}`);
-}
-
-export async function fetchSystemStats(): Promise<any> {
-  return getJSON<any>("/api/superadmin/system-stats");
-}
-
-export async function fetchIncidents(): Promise<any[]> {
-  return getJSON<any[]>("/api/superadmin/incidents");
-}
-
-export async function createIncident(payload: { title: string; message: string; severity: string }): Promise<any> {
-  const res = await fetch("/api/superadmin/incidents", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    throw new Error(`Request failed (${res.status})`);
-  }
-  return res.json();
-}
-
-export async function resolveIncident(id: string): Promise<void> {
-  const res = await fetch(`/api/superadmin/incidents/${id}/resolve`, {
-    method: "PATCH",
-    credentials: "include",
-  });
-  if (!res.ok) {
-    throw new Error(`Request failed (${res.status})`);
-  }
-}
-
-export async function fetchAssets(): Promise<any[]> {
-  return getJSON<any[]>("/api/superadmin/assets");
-}
-
-export async function purgeAsset(id: string): Promise<void> {
-  const res = await fetch(`/api/superadmin/assets/${id}/purge`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  if (!res.ok) {
-    throw new Error(`Request failed (${res.status})`);
   }
 }
