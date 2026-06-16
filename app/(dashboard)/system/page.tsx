@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import TopBar from "@/components/TopBar";
 import {
-  fetchSystemStats,
+  fetchSystemMetricsData,
+  fetchSystemLogs,
   fetchIncidents,
   createIncident,
   resolveIncident,
@@ -15,7 +16,6 @@ import {
   AlertTriangle,
   Cpu,
   Database,
-  Download,
   Flame,
   HardDrive,
   Loader2,
@@ -23,20 +23,19 @@ import {
   Server,
   Trash2,
   Wifi,
+  TerminalSquare
 } from "lucide-react";
+import { SystemMetrics } from "@/lib/types";
 
-type SystemTab = "telemetry" | "incidents" | "assets";
+type SystemTab = "telemetry" | "logs" | "incidents" | "assets";
 
 export default function SystemControlPage() {
   const [activeTab, setActiveTab] = useState<SystemTab>("telemetry");
-  const [stats, setStats] = useState<any>(null);
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
   const [incidents, setIncidents] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Telemetry history for rendering simple sparklines
-  const [cpuHistory, setCpuHistory] = useState<number[]>([]);
-  const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
 
   // Incident form state
   const [incidentForm, setIncidentForm] = useState({
@@ -50,19 +49,21 @@ export default function SystemControlPage() {
   const loadData = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      const [s, inc, ast] = await Promise.all([
-        fetchSystemStats(),
-        fetchIncidents(),
-        fetchAssets(),
-      ]);
-      setStats(s);
-      setIncidents(inc);
-      setAssets(ast);
-
-      setCpuHistory((prev) => [...prev.slice(-15), s.cpu]);
-      setLatencyHistory((prev) => [...prev.slice(-15), s.latency]);
+      if (activeTab === "telemetry") {
+        const m = await fetchSystemMetricsData();
+        setMetrics(m);
+      } else if (activeTab === "logs") {
+        const l = await fetchSystemLogs();
+        setLogs(l.logs);
+      } else if (activeTab === "incidents" && incidents.length === 0) {
+        const inc = await fetchIncidents();
+        setIncidents(inc);
+      } else if (activeTab === "assets" && assets.length === 0) {
+        const ast = await fetchAssets();
+        setAssets(ast);
+      }
     } catch (err) {
-      console.error("Failed to fetch system command data:", err);
+      console.error("Failed to fetch system data:", err);
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -71,13 +72,13 @@ export default function SystemControlPage() {
   useEffect(() => {
     void loadData(true);
 
-    // Fast polling interval for telemetry stats
+    // Polling interval for live data
     const timer = setInterval(() => {
       void loadData(false);
-    }, 2000);
+    }, 3000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [activeTab]);
 
   const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,13 +135,13 @@ export default function SystemControlPage() {
     <div className="min-h-screen bg-slate-50/50 pb-12 w-full text-slate-900">
       <TopBar
         title={<h1 className="text-3xl font-extrabold tracking-tight text-slate-900">System Control</h1>}
-        subtitle="Platform-wide technical operations, active incidents broadcasting, and 3D menu assets."
+        subtitle="Platform-wide technical operations, server metrics, and global logs."
       />
 
       <section className="px-8 py-8 max-w-7xl mx-auto space-y-6">
         {/* Navigation Tabs */}
         <div className="flex border-b border-slate-200">
-          {(["telemetry", "incidents", "assets"] as const).map((tab) => (
+          {(["telemetry", "logs", "incidents", "assets"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -150,12 +151,12 @@ export default function SystemControlPage() {
                   : "border-transparent text-slate-500 hover:text-slate-900"
               }`}
             >
-              {tab === "assets" ? "3D Storage Bucket" : tab === "incidents" ? "Incident Broadcasts" : "Live Telemetry"}
+              {tab === "assets" ? "3D Storage Bucket" : tab === "incidents" ? "Incident Broadcasts" : tab === "logs" ? "Live Server Logs" : "Live Telemetry"}
             </button>
           ))}
         </div>
 
-        {loading && !stats ? (
+        {loading ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200 rounded-2xl shadow-sm gap-3">
             <Loader2 className="h-8 w-8 text-slate-700 animate-spin" />
             <p className="text-sm font-medium text-slate-500">Connecting command center...</p>
@@ -163,29 +164,23 @@ export default function SystemControlPage() {
         ) : (
           <div className="space-y-6">
             {/* TABS 1: TELEMETRY */}
-            {activeTab === "telemetry" && stats && (
+            {activeTab === "telemetry" && metrics && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                {/* CPU Utilization Meter */}
+                {/* Goroutines */}
                 <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-48">
                   <div className="flex justify-between items-start">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                       <Cpu className="h-4 w-4 text-indigo-500" />
-                      CPU Utilization
+                      Active Goroutines
                     </p>
                     <span className="text-[10px] font-bold text-slate-400 font-mono">Live Radar</span>
                   </div>
                   <div className="my-2">
                     <div className="flex items-baseline gap-1">
-                      <p className="text-4xl font-black text-slate-900 tracking-tight">{stats.cpu}%</p>
-                    </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-                      <div
-                        className="bg-indigo-650 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${stats.cpu}%` }}
-                      />
+                      <p className="text-4xl font-black text-slate-900 tracking-tight">{metrics.numGoroutines}</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Core Clusters Optimal</p>
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Concurrency Optimal</p>
                 </div>
 
                 {/* RAM Gauge */}
@@ -193,44 +188,38 @@ export default function SystemControlPage() {
                   <div className="flex justify-between items-start">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                       <Server className="h-4 w-4 text-emerald-500" />
-                      Node Memory
+                      Allocated Memory
                     </p>
-                    <span className="text-[10px] font-bold text-slate-400 font-mono">Total 2GB</span>
+                    <span className="text-[10px] font-bold text-slate-400 font-mono">Go Runtime</span>
                   </div>
                   <div className="my-2">
-                    <p className="text-4xl font-black text-slate-900 tracking-tight">{stats.memory} <span className="text-sm font-bold text-slate-400">MB</span></p>
+                    <p className="text-4xl font-black text-slate-900 tracking-tight">{(metrics.allocBytes / 1024 / 1024).toFixed(1)} <span className="text-sm font-bold text-slate-400">MB</span></p>
                     <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
                       <div
                         className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${(stats.memory / stats.maxMemory) * 100}%` }}
+                        style={{ width: `${Math.min((metrics.allocBytes / metrics.sysBytes) * 100, 100)}%` }}
                       />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Buffer Cache Healthy</p>
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Sys: {(metrics.sysBytes / 1024 / 1024).toFixed(1)} MB</p>
                 </div>
 
-                {/* API latency Sparkline */}
+                {/* Garbage Collection */}
                 <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-48">
                   <div className="flex justify-between items-start">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                       <Activity className="h-4 w-4 text-amber-500 animate-pulse" />
-                      API Response Latency
+                      Garbage Collections
                     </p>
-                    <span className="text-[10px] font-bold text-slate-400 font-mono">Edge Pool</span>
+                    <span className="text-[10px] font-bold text-slate-400 font-mono">Total GC</span>
                   </div>
                   <div className="my-2">
-                    <p className="text-4xl font-black text-slate-900 tracking-tight">{stats.latency} <span className="text-sm font-bold text-slate-400">ms</span></p>
-                    <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
-                      <div
-                        className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${(stats.latency / 250) * 100}%` }}
-                      />
-                    </div>
+                    <p className="text-4xl font-black text-slate-900 tracking-tight">{metrics.numGC} <span className="text-sm font-bold text-slate-400">cycles</span></p>
                   </div>
-                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Request Routes Fast</p>
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Heap Healthy</p>
                 </div>
 
-                {/* Active Websockets and DB pool */}
+                {/* Active Websockets */}
                 <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-48">
                   <div className="flex justify-between items-start">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -239,22 +228,51 @@ export default function SystemControlPage() {
                     </p>
                     <span className="text-[10px] font-bold text-slate-400 font-mono">Live SSE</span>
                   </div>
-                  <div className="my-2 flex justify-between items-end gap-2">
-                    <div>
-                      <p className="text-3xl font-black text-slate-900 tracking-tight">{stats.wsClients}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">POS Websockets</p>
-                    </div>
-                    <div className="text-right border-l border-slate-100 pl-4">
-                      <p className="text-xl font-black text-slate-900 font-mono">{stats.dbConnections}/20</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">DB Pool</p>
-                    </div>
+                  <div className="my-2">
+                    <p className="text-3xl font-black text-slate-900 tracking-tight">{metrics.activeWebsockets}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">POS Websockets</p>
                   </div>
                   <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono">Socket Pipelines Syncing</p>
                 </div>
               </div>
             )}
 
-            {/* TABS 2: INCIDENTS */}
+            {/* TABS 2: LOGS */}
+            {activeTab === "logs" && (
+              <div className="bg-[#1e1e1e] border border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col" style={{ height: "70vh" }}>
+                <div className="bg-[#2d2d2d] border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TerminalSquare className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-sm font-mono text-slate-200">api-live.log</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      STREAMING LIVE
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-relaxed text-slate-300 space-y-1">
+                  {logs.length === 0 ? (
+                    <p className="text-slate-500 italic">No logs found or api-live.log is empty.</p>
+                  ) : (
+                    logs.map((logLine, idx) => (
+                      <div key={idx} className="break-all whitespace-pre-wrap">
+                        {logLine.includes('"level":"ERROR"') || logLine.includes('level=ERROR') ? (
+                          <span className="text-rose-400">{logLine}</span>
+                        ) : logLine.includes('"level":"WARN"') || logLine.includes('level=WARN') ? (
+                          <span className="text-amber-400">{logLine}</span>
+                        ) : (
+                          logLine
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TABS 3: INCIDENTS */}
             {activeTab === "incidents" && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Broadcast Form */}
@@ -396,7 +414,7 @@ export default function SystemControlPage() {
               </div>
             )}
 
-            {/* TABS 3: ASSETS */}
+            {/* TABS 4: ASSETS */}
             {activeTab === "assets" && (
               <div className="space-y-6">
                 {/* Storage summary bar */}

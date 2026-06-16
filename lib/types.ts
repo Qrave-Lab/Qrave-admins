@@ -267,3 +267,26 @@ export type PlatformOperations = {
   globalDiscounts: GlobalDiscount[];
   qadmins: QAdminUser[];
 };
+
+export type SubscriptionInvoice = {
+  id: string;
+  restaurantId: string;
+  restaurantName: string;
+  provider: string;
+  providerInvoiceId: string;
+  amountCents: number;
+  status: string;
+  hostedInvoiceUrl: string;
+  invoicePdf: string;
+  createdAt: string;
+  paidAt: string | null;
+};
+
+export type SystemMetrics = {
+  allocBytes: number;
+  sysBytes: number;
+  numGoroutines: number;
+  numGC: number;
+  serverUptimeSec: number;
+  activeWebsockets: number;
+};

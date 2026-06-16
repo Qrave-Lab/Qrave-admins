@@ -5,16 +5,18 @@ import OrdersChart from "@/components/OrdersChart";
 import RangeTabs from "@/components/RangeTabs";
 import RevenueChart from "@/components/RevenueChart";
 import TopBar from "@/components/TopBar";
-import { fetchRevenueSeries } from "@/lib/api";
+import { fetchRevenueSeries, fetchMRRBreakdown } from "@/lib/api";
 import { RevenuePoint, RevenueRange } from "@/lib/types";
-import { Download } from "lucide-react";
+import { Download, TrendingUp } from "lucide-react";
 
 export default function RevenuePage() {
   const [range, setRange] = useState<RevenueRange>("month");
   const [series, setSeries] = useState<RevenuePoint[]>([]);
+  const [mrrData, setMrrData] = useState<{ totalMRR: number; activeSubscriptions: number } | null>(null);
 
   useEffect(() => {
     void fetchRevenueSeries(range).then(setSeries);
+    void fetchMRRBreakdown().then(setMrrData);
   }, [range]);
 
   const totalRevenue = useMemo(() => series.reduce((sum, p) => sum + p.revenue, 0), [series]);
@@ -64,14 +66,34 @@ export default function RevenuePage() {
       />
 
       {/* KPI Cards */}
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 px-6">
+      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 px-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+            <TrendingUp className="w-4 h-4 text-emerald-500" />
+            Total MRR
+          </p>
+          <p className="mt-4 text-4xl font-black text-gray-900 tabular-nums">
+            <span className="text-gray-400 mr-2 text-3xl">₹</span>
+            {mrrData ? (mrrData.totalMRR / 100).toLocaleString("en-IN") : "..."}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Active Subscriptions
+          </p>
+          <p className="mt-4 text-4xl font-black text-gray-900 tabular-nums">
+            {mrrData ? mrrData.activeSubscriptions : "..."} <span className="text-base text-gray-400 font-bold">tenants</span>
+          </p>
+        </div>
+
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
             Total Revenue ({range})
           </p>
           <p className="mt-4 text-4xl font-black text-gray-900 tabular-nums">
             <span className="text-gray-400 mr-2 text-3xl">₹</span>
-            {totalRevenue.toLocaleString("en-IN")}
+            {(totalRevenue / 100).toLocaleString("en-IN")}
           </p>
         </div>
 

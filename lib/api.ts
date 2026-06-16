@@ -17,6 +17,8 @@ import {
   RevenuePoint,
   RevenueRange,
   UserStatus,
+  SubscriptionInvoice,
+  SystemMetrics,
 } from "@/lib/types";
 
 async function getJSON<T>(path: string): Promise<T> {
@@ -249,4 +251,84 @@ export async function deleteQAdmin(username: string): Promise<void> {
     const message = await res.text().catch(() => "");
     throw new Error(message || `Request failed (${res.status})`);
   }
+}
+
+export async function fetchAuditLogs(search = "", action = ""): Promise<AuditLogRecord[]> {
+  const searchQ = search ? `&search=${encodeURIComponent(search)}` : "";
+  const actionQ = action ? `&action=${encodeURIComponent(action)}` : "";
+  return getJSON<AuditLogRecord[]>(`/api/superadmin/audit-logs?${searchQ}${actionQ}`);
+}
+
+export async function fetchSystemStats(): Promise<any> {
+  return getJSON<any>("/api/superadmin/system-stats");
+}
+
+export async function fetchIncidents(): Promise<any[]> {
+  return getJSON<any[]>("/api/superadmin/incidents");
+}
+
+export async function createIncident(payload: { title: string; message: string; severity: string }): Promise<any> {
+  const res = await fetch("/api/superadmin/incidents", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function resolveIncident(id: string): Promise<void> {
+  const res = await fetch(`/api/superadmin/incidents/${id}/resolve`, {
+    method: "PATCH",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+}
+
+export async function fetchAssets(): Promise<any[]> {
+  return getJSON<any[]>("/api/superadmin/assets");
+}
+
+export async function purgeAsset(id: string): Promise<void> {
+  const res = await fetch(`/api/superadmin/assets/${id}/purge`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+}
+
+export async function fetchMRRBreakdown(): Promise<any> {
+  return getJSON<any>("/api/superadmin/mrr");
+}
+
+export async function fetchInvoices(): Promise<SubscriptionInvoice[]> {
+  return getJSON<SubscriptionInvoice[]>("/api/superadmin/invoices");
+}
+
+export async function fetchSystemMetricsData(): Promise<SystemMetrics> {
+  return getJSON<SystemMetrics>("/api/superadmin/system/metrics");
+}
+
+export async function fetchSystemLogs(): Promise<{ logs: string[] }> {
+  return getJSON<{ logs: string[] }>("/api/superadmin/system/logs");
+}
+
+export async function setSubscriptionTier(restaurantID: string, tierID: string | null, provider: string): Promise<void> {
+  const res = await fetch(`/api/superadmin/restaurants/${restaurantID}/subscription`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tierId: tierID, provider }),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+}
 }

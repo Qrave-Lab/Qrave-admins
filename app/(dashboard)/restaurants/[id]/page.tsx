@@ -426,6 +426,14 @@ export default function RestaurantDetailPage() {
               >
                 {extendingSubscription ? "Adding..." : "Add Days"}
               </button>
+
+              {/* Manage Billing Link */}
+              <Link
+                href={`/restaurants/${id}/billing`}
+                className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
+              >
+                Manage Billing & Subscriptions
+              </Link>
             </div>
           </div>
         </div>
