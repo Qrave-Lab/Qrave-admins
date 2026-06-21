@@ -6,3 +6,29 @@ out
 *.log
 cookie.txt
 tsconfig.tsbuildinfo
+
+# --- Global Ignores Added by Cleanup ---
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Trashes
+# Python
+__pycache__/
+*.py[cod]
+*.class
+venv/
+.venv/
+.pytest_cache/
+# Node
+node_modules/
+dist/
+.next/
+coverage/
+# Go
+bin/
+*.test
+# Secrets
+.env.development.local
+.env.test.local
+.env.production.local
