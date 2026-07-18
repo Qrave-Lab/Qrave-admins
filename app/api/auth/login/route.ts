@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { validateSuperadminCredentials } from "@/lib/auth/credentials";
+import { SignJWT } from "jose";
 
 const SESSION_COOKIE = "qrave_sa_session";
+const secretKey = new TextEncoder().encode(process.env.SUPERADMIN_API_KEY || "superadmin-secret-dev-key");
 
 type LocalAuthResult = {
     available: boolean;
@@ -58,7 +60,12 @@ export async function POST(request: Request) {
             }
         }
 
-        const token = Buffer.from(sessionSubject).toString("base64");
+        const [id, ...userParts] = sessionSubject.split(":");
+        const token = await new SignJWT({ id, username: userParts.join(":") })
+            .setProtectedHeader({ alg: "HS256" })
+            .setExpirationTime("12h")
+            .sign(secretKey);
+
         const res = NextResponse.json({ ok: true, message: "Logged in successfully" });
 
         res.cookies.set(SESSION_COOKIE, token, {

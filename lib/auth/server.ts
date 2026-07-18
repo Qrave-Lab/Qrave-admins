@@ -2,7 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
+import { jwtVerify } from "jose";
+
 export const SESSION_COOKIE = "qrave_sa_session";
+const secretKey = new TextEncoder().encode(process.env.SUPERADMIN_API_KEY || "superadmin-secret-dev-key");
 
 type SessionUser = {
   id: string;
@@ -15,8 +18,9 @@ async function decodeSession(): Promise<SessionUser | null> {
   if (!token) return null;
 
   try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8");
-    const [id, username] = decoded.split(":");
+    const { payload } = await jwtVerify(token, secretKey);
+    const id = payload.id as string;
+    const username = payload.username as string;
     if (!id || !username) return null;
     return { id, username };
   } catch {
