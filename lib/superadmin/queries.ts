@@ -641,6 +641,8 @@ export async function listQAdminUsers() {
     SELECT
       id,
       username,
+      name,
+      role,
       to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
     FROM superadmin_users
     ORDER BY created_at DESC
@@ -649,6 +651,8 @@ export async function listQAdminUsers() {
   return rows.map((row: any) => ({
     id: row.id,
     username: row.username,
+    name: row.name,
+    role: row.role,
     createdAt: row.created_at,
   }));
 }

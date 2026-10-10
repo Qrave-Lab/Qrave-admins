@@ -75,9 +75,11 @@ export default function Sidebar() {
   return (
     <>
       {/* ── Mobile Top Bar ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200">
-        <div className="h-8 w-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0">Q</div>
-        <p className="flex-1 text-sm font-bold text-slate-900 tracking-tight">Qrave Superadmin</p>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200">
+        <div className="h-8 px-2 py-1 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
+          <img src="/logo.png" alt="Qrave" className="h-5 w-auto object-contain" />
+        </div>
+        <p className="flex-1 text-sm font-bold text-slate-900 tracking-tight">Superadmin</p>
         <button
           type="button"
           onClick={() => setMobileOpen(v => !v)}
@@ -112,25 +114,44 @@ export default function Sidebar() {
       </aside>
 
       {/* ── Desktop Sidebar ── */}
-      <aside className={`hidden md:flex ${collapsed ? "w-[92px]" : "w-[260px]"} shrink-0 h-screen sticky top-0 border-r border-slate-200 bg-white flex-col transition-all duration-300 overflow-hidden`}>
+      <aside className={`hidden md:flex ${collapsed ? "w-[84px]" : "w-[260px]"} shrink-0 h-screen sticky top-0 border-r border-slate-200 bg-white flex-col transition-all duration-300 overflow-hidden`}>
         {/* Logo + toggle */}
-        <div className={`flex items-center ${collapsed ? "justify-center px-4" : "justify-between px-5"} py-5 border-b border-slate-100 gap-3`}>
-          {!collapsed && (
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0">Q</div>
-              <p className="truncate text-[14px] font-bold text-slate-900 tracking-tight">Qrave Superadmin</p>
-            </div>
+        <div className={`flex ${collapsed ? "flex-col items-center gap-3 py-4 px-2" : "items-center justify-between px-5 py-4"} border-b border-slate-100`}>
+          {!collapsed ? (
+            <>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 px-2 py-1 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0 shadow-xs">
+                  <img src="/logo.png" alt="Qrave" className="h-6 w-auto object-contain" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate text-sm font-bold text-slate-900 tracking-tight leading-none">Superadmin</span>
+                  <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mt-1">Control Plane</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex items-center justify-center h-8 w-8 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
+                onClick={() => setCollapsed(true)}
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose size={15} />
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="h-9 w-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center p-1 shadow-xs" title="Qrave Superadmin">
+                <img src="/logo.png" alt="Qrave" className="h-full w-full object-contain" />
+              </div>
+              <button
+                type="button"
+                className="flex items-center justify-center h-8 w-8 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                onClick={() => setCollapsed(false)}
+                title="Expand sidebar"
+              >
+                <PanelLeftOpen size={15} />
+              </button>
+            </>
           )}
-          {collapsed && (
-            <div className="h-8 w-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm">Q</div>
-          )}
-          <button
-            type="button"
-            className={`flex items-center justify-center h-8 w-8 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0 ${collapsed ? "absolute top-5 right-4" : ""}`}
-            onClick={() => setCollapsed(v => !v)}
-          >
-            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-          </button>
         </div>
 
         {/* Nav links */}

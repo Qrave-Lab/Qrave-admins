@@ -211,6 +211,8 @@ export type TakeawayOrderRecord = {
 export type QAdminUser = {
   id: string;
   username: string;
+  name?: string;
+  role?: string;
   createdAt: string;
 };
 
