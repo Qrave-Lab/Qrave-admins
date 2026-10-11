@@ -1,3 +1,6 @@
+import type { ChurnSignals } from "@/lib/churn";
+export type { ChurnSignals };
+
 export type RestaurantStatus = "active" | "trial" | "churn-risk" | "disabled" | "revoked";
 export type UserStatus = "active" | "disabled" | "revoked";
 
@@ -6,7 +9,7 @@ export type RestaurantSummary = {
   brandName: string;
   locationName: string;
   ownerEmail: string;
-  plan: "starter" | "growth" | "pro";
+  plan: "starter" | "growth" | "pro" | "enterprise" | string;
   status: RestaurantStatus;
   statusReason?: string;
   billingStatus?: string;
@@ -16,6 +19,7 @@ export type RestaurantSummary = {
   createdAt: string;
   totalRevenueRange: number;
   memberSince: string;
+  churnSignals?: ChurnSignals;
 };
 
 export type RevenueRange = "week" | "month" | "year";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import { updateStaffFeedback } from "@/lib/superadmin/queries";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function POST(
   request: Request,
@@ -22,11 +23,29 @@ export async function POST(
     const { status, response } = body;
 
     if (!status) {
-        return NextResponse.json({ error: "status required" }, { status: 400 });
+      return NextResponse.json({ error: "status required" }, { status: 400 });
     }
 
     const actor = (await requireSessionEmail()) || "qadmin";
-    await updateStaffFeedback(id, status, response || "", actor); 
+    await updateStaffFeedback(id, status, response || "", actor);
+
+    let ticketTitle = id;
+    try {
+      const fRes = await db.query("SELECT title FROM staff_feedback WHERE id = $1", [id]);
+      if (fRes.rows[0]?.title) ticketTitle = fRes.rows[0].title;
+    } catch {}
+
+    await recordAuditLog({
+      action: "FEEDBACK_RESPONSE",
+      entityType: "feedback",
+      entityId: id,
+      entityName: ticketTitle,
+      details: {
+        status,
+        response_note: response || "",
+      },
+      actorUsername: actor,
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {

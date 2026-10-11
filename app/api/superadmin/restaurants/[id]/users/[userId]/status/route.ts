@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
 import { setRestaurantUserStatus } from "@/lib/superadmin/queries";
+import { recordAuditLog } from "@/lib/audit";
+import { db } from "@/lib/db";
 
 export async function PATCH(
   request: Request,
@@ -23,6 +25,28 @@ export async function PATCH(
     if (result === null) {
       return NextResponse.json({ error: "user/restaurant not found" }, { status: 404 });
     }
+
+    let userName = userId;
+    try {
+      const uRes = await db.query("SELECT name, email FROM users WHERE id = $1", [userId]);
+      if (uRes.rows[0]) {
+        userName = uRes.rows[0].name || uRes.rows[0].email || userId;
+      }
+    } catch {}
+
+    await recordAuditLog({
+      action: "USER_STATUS_CHANGE",
+      entityType: "user",
+      entityId: userId,
+      entityName: userName,
+      details: {
+        restaurant_id: id,
+        new_status: status,
+        reason: reason || null,
+      },
+      actorUsername: actor,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("set user status error:", err);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuthJson } from "@/lib/auth/server";
 import { getRestaurantDetail } from "@/lib/superadmin/queries";
 import { db } from "@/lib/db";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function GET(
   request: Request,
@@ -35,17 +36,26 @@ export async function DELETE(
   try {
     const { id } = await params;
     
-    // Cascade delete - this should match the server action logic but ideally DB should handle cascade
-    // or we strictly delete everything manually.
+    let restName = id;
+    try {
+      const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [id]);
+      if (rRes.rows[0]?.name) restName = rRes.rows[0].name;
+    } catch {}
+
     await db.query("DELETE FROM restaurant_users WHERE restaurant_id = $1", [id]);
     await db.query("DELETE FROM menu_items WHERE restaurant_id = $1", [id]);
     await db.query("DELETE FROM menu_categories WHERE restaurant_id = $1", [id]);
     await db.query("DELETE FROM offer_campaigns WHERE restaurant_id = $1", [id]);
-    // Add more deletions as necessary (orders, tables, etc)
-    // For now, this covers the requested "menu items... permissions" part roughly
-    
     await db.query("DELETE FROM restaurants WHERE id = $1", [id]);
     
+    await recordAuditLog({
+      action: "RESTAURANT_DELETE",
+      entityType: "restaurant",
+      entityId: id,
+      entityName: restName,
+      details: { deleted_restaurant_id: id, restaurant_name: restName },
+    });
+
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("failed to delete restaurant", err);

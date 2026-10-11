@@ -17,6 +17,7 @@ import {
   FileText,
   ShieldCheck,
   Wrench,
+  SlidersHorizontal,
   Menu,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/operations", label: "Operations", icon: Wrench },
   { href: "/restaurants", label: "Restaurants", icon: Store },
+  { href: "/plans", label: "Plans & Flags", icon: SlidersHorizontal },
   { href: "/menu", label: "Menu Management", icon: Utensils },
   { href: "/staff", label: "Staff", icon: Users },
   { href: "/discounts", label: "Discounts & Coupons", icon: TicketPercent },

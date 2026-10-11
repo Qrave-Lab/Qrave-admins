@@ -6,12 +6,13 @@ import TopBar from "@/components/TopBar";
 import { fetchOverview, fetchRestaurants } from "@/lib/api";
 import { Overview, RestaurantSummary, RevenueRange } from "@/lib/types";
 
-type PlanKey = "starter" | "growth" | "pro";
+type PlanKey = "starter" | "growth" | "pro" | "enterprise";
 
 const planLabel: Record<PlanKey, string> = {
   starter: "Starter",
   growth: "Growth",
   pro: "Pro",
+  enterprise: "Enterprise",
 };
 
 export default function AnalyticsPage() {
@@ -62,10 +63,12 @@ export default function AnalyticsPage() {
       starter: { count: 0, mrr: 0 },
       growth: { count: 0, mrr: 0 },
       pro: { count: 0, mrr: 0 },
+      enterprise: { count: 0, mrr: 0 },
     };
     for (const row of restaurants) {
-      seed[row.plan].count += 1;
-      seed[row.plan].mrr += row.mrr;
+      const p = (row.plan in seed ? row.plan : "starter") as PlanKey;
+      seed[p].count += 1;
+      seed[p].mrr += row.mrr;
     }
     return (Object.keys(seed) as PlanKey[]).map((key) => {
       const contribution = mrr > 0 ? Math.round((seed[key].mrr / mrr) * 100) : 0;

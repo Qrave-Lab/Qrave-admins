@@ -11,7 +11,8 @@ import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
 export default function RestaurantsPage() {
   const [range, setRange] = useState<RevenueRange>("month");
   const [rows, setRows] = useState<RestaurantSummary[]>([]);
-  const [queryText, setQueryText] = useState(""); // Renamed to avoid conflict if any, though query works
+  const [queryText, setQueryText] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [pendingID, setPendingID] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -58,10 +59,17 @@ export default function RestaurantsPage() {
   }, [range]);
 
   const filtered = useMemo(() => {
+    let list = rows;
+    if (statusFilter === "churn-risk") {
+      list = list.filter((r) => r.status === "churn-risk" || (r.churnSignals?.riskScore ?? 0) >= 45);
+    } else if (statusFilter !== "all") {
+      list = list.filter((r) => r.status === statusFilter);
+    }
+
     const q = queryText.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => [r.brandName, r.locationName, r.ownerEmail ?? ""].some((v) => v.toLowerCase().includes(q)));
-  }, [rows, queryText]);
+    if (!q) return list;
+    return list.filter((r) => [r.brandName, r.locationName, r.ownerEmail ?? ""].some((v) => v.toLowerCase().includes(q)));
+  }, [rows, queryText, statusFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, RestaurantSummary[]>();
@@ -104,10 +112,10 @@ export default function RestaurantsPage() {
 
   const totals = useMemo(() => {
     const active = rows.filter((r) => r.status === "active").length;
-    // ... existing logic
     const disabled = rows.filter((r) => r.status === "disabled" || r.status === "revoked").length;
+    const atRisk = rows.filter((r) => r.status === "churn-risk" || (r.churnSignals?.riskScore ?? 0) >= 45).length;
     const mrr = rows.reduce((sum, r) => sum + r.mrr, 0);
-    return { active, disabled, mrr };
+    return { active, disabled, atRisk, mrr };
   }, [rows]);
 
   const setStatus = async (restaurantID: string, status: RestaurantStatus) => {
@@ -194,6 +202,40 @@ export default function RestaurantsPage() {
           </div>
         </dl>
 
+        {r.churnSignals && (
+          <div className="mt-3.5 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                  r.churnSignals.riskLevel === "critical"
+                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                    : r.churnSignals.riskLevel === "high"
+                    ? "bg-orange-100 text-orange-800 border border-orange-200"
+                    : r.churnSignals.riskLevel === "moderate"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {r.churnSignals.riskLevel} Churn Risk ({r.churnSignals.riskScore}/100)
+              </span>
+              <span className="text-gray-500 text-[11px]">
+                {r.churnSignals.daysSinceLastOrder !== null
+                  ? `${r.churnSignals.daysSinceLastOrder}d inactive`
+                  : "0 orders"}
+              </span>
+            </div>
+
+            {r.churnSignals.deadQrScans7d > 0 && (
+              <span
+                className="text-rose-600 font-semibold text-[11px]"
+                title="Table sessions started with zero orders placed"
+              >
+                ⚠️ {r.churnSignals.deadQrScans7d} dead QR scans (7d)
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <button
             className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
@@ -250,29 +292,72 @@ export default function RestaurantsPage() {
           </button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Restaurants</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">{rows.length}</p>
           </article>
-          <article className="rounded-xl border border-gray-200 bg-white p-4">
+          <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Active</p>
             <p className="mt-1 text-2xl font-bold text-green-700">{totals.active}</p>
           </article>
-          <article className="rounded-xl border border-gray-200 bg-white p-4">
+          <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total MRR</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">₹{totals.mrr.toLocaleString("en-IN")}</p>
           </article>
+          <article
+            onClick={() => setStatusFilter(statusFilter === "churn-risk" ? "all" : "churn-risk")}
+            className={`cursor-pointer rounded-xl border p-4 shadow-xs transition-colors ${
+              statusFilter === "churn-risk"
+                ? "border-rose-300 bg-rose-50 ring-1 ring-rose-200"
+                : "border-rose-200 bg-rose-50/40 hover:bg-rose-50"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">At-Risk Radar</p>
+              {totals.atRisk > 0 && (
+                <span className="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              )}
+            </div>
+            <p className="mt-1 text-2xl font-bold text-rose-800">{totals.atRisk} At Risk</p>
+            <p className="text-[11px] text-rose-600 mt-0.5">Click to view signals</p>
+          </article>
         </div>
 
-        <div className="relative max-w-xl">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none ring-blue-200 transition focus:border-blue-500 focus:ring-2"
-            placeholder="Search brand, location, owner email"
-            value={queryText}
-            onChange={(e) => setQueryText(e.target.value)}
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm outline-none ring-blue-200 transition focus:border-blue-500 focus:ring-2"
+              placeholder="Search brand, location, owner email..."
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {[
+              { id: "all", label: `All (${rows.length})` },
+              { id: "active", label: `Active (${totals.active})` },
+              { id: "churn-risk", label: `At-Risk (${totals.atRisk})` },
+              { id: "trial", label: "Trial" },
+              { id: "disabled", label: `Disabled (${totals.disabled})` },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                  statusFilter === tab.id
+                    ? tab.id === "churn-risk"
+                      ? "bg-rose-600 text-white shadow-xs"
+                      : "bg-slate-900 text-white shadow-xs"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading && rows.length === 0 ? (

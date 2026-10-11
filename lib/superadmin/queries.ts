@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { evaluateChurnSignals } from "@/lib/churn";
 
 /* ── helpers ── */
 
@@ -63,19 +64,18 @@ export async function listRestaurants(rangeDays: number) {
       COALESCE(owner.email,  '')         AS owner_email,
       rest.subscription_plan,
       COALESCE(rest.subscription_status, 'trialing') AS subscription_status,
-      COALESCE(ctrl.status,
-        CASE
-          WHEN rest.subscription_status='trialing' THEN 'trial'
-          WHEN rest.subscription_status='active'   THEN 'active'
-          WHEN rest.subscription_status IN ('past_due','halted','expired','canceled') THEN 'churn-risk'
-          ELSE 'trial'
-        END
-      ) AS resolved_status,
+      COALESCE(ctrl.status, '')          AS manual_status,
       COALESCE(ctrl.reason, '')          AS status_reason,
       COALESCE(today.revenue,0)::BIGINT  AS today_revenue,
       COALESCE(today.orders,0)::BIGINT   AS orders_today,
       COALESCE(win.revenue,0)::BIGINT    AS range_revenue,
-      to_char(rest.created_at::date, 'YYYY-MM-DD') AS created_at
+      to_char(rest.created_at::date, 'YYYY-MM-DD') AS created_at,
+      last_ord.last_order_at,
+      last_ord.days_since_last_order,
+      COALESCE(scans.dead_scans_7d, 0)   AS dead_scans_7d,
+      COALESCE(scans.total_scans_7d, 0)  AS total_scans_7d,
+      COALESCE(vel.orders_last_7d, 0)    AS orders_last_7d,
+      COALESCE(vel.orders_prior_7d, 0)   AS orders_prior_7d
     FROM restaurants rest
     LEFT JOIN superadmin_restaurant_controls ctrl ON ctrl.restaurant_id = rest.id
     LEFT JOIN LATERAL (
@@ -102,6 +102,33 @@ export async function listRestaurants(rangeDays: number) {
         AND p.status = 'paid'
         AND COALESCE(p.captured_at, p.created_at) >= (NOW() - make_interval(days => $1))
     ) win ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        MAX(created_at) AS last_order_at,
+        EXTRACT(DAY FROM (NOW() - MAX(created_at)))::INT AS days_since_last_order
+      FROM orders
+      WHERE restaurant_id = rest.id
+    ) last_ord ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(s.id)::INT AS total_scans_7d,
+        COUNT(s.id) FILTER (WHERE ord.order_count IS NULL OR ord.order_count = 0)::INT AS dead_scans_7d
+      FROM sessions s
+      LEFT JOIN LATERAL (
+        SELECT COUNT(o.id) AS order_count
+        FROM orders o
+        WHERE o.session_id = s.id
+      ) ord ON TRUE
+      WHERE s.restaurant_id = rest.id
+        AND s.started_at >= (NOW() - INTERVAL '7 days')
+    ) scans ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(id) FILTER (WHERE created_at >= (NOW() - INTERVAL '7 days'))::INT AS orders_last_7d,
+        COUNT(id) FILTER (WHERE created_at >= (NOW() - INTERVAL '14 days') AND created_at < (NOW() - INTERVAL '7 days'))::INT AS orders_prior_7d
+      FROM orders
+      WHERE restaurant_id = rest.id
+    ) vel ON TRUE
     WHERE COALESCE(rest.is_archived, FALSE) = FALSE
     ORDER BY win.revenue DESC, rest.created_at DESC
   `, [rangeDays]);
@@ -109,14 +136,44 @@ export async function listRestaurants(rangeDays: number) {
   return rows.map((r: any) => {
     const plan = normalisePlan(r.subscription_plan);
     const subscriptionStatus = String(r.subscription_status || "trialing");
+
+    const churnSignals = evaluateChurnSignals({
+      daysSinceLastOrder: r.days_since_last_order !== null ? Number(r.days_since_last_order) : null,
+      lastOrderDate: r.last_order_at ? new Date(r.last_order_at).toISOString() : null,
+      deadQrScans7d: Number(r.dead_scans_7d || 0),
+      totalQrScans7d: Number(r.total_scans_7d || 0),
+      ordersLast7d: Number(r.orders_last_7d || 0),
+      ordersPrior7d: Number(r.orders_prior_7d || 0),
+      billingStatus: subscriptionStatus,
+    });
+
+    let status = r.manual_status;
+    let reason = r.status_reason;
+
+    if (!status) {
+      if (churnSignals.riskLevel === "critical" || churnSignals.riskLevel === "high") {
+        status = "churn-risk";
+        reason = churnSignals.reasons[0] || "Behavioral churn signals detected";
+      } else if (subscriptionStatus === "trialing") {
+        status = "trial";
+      } else if (subscriptionStatus === "active") {
+        status = "active";
+      } else if (["past_due", "halted", "expired", "canceled"].includes(subscriptionStatus)) {
+        status = "churn-risk";
+        reason = `Billing status ${subscriptionStatus}`;
+      } else {
+        status = "trial";
+      }
+    }
+
     return {
       id: r.id,
       brandName: r.name,
       locationName: r.location,
       ownerEmail: r.owner_email,
       plan,
-      status: r.resolved_status,
-      statusReason: r.status_reason,
+      status,
+      statusReason: reason,
       mrr: subscriptionStatus === "active" ? mrrFromSubscriptionPlan(r.subscription_plan) : 0,
       billingStatus: subscriptionStatus,
       todayRevenue: Number(r.today_revenue),
@@ -124,6 +181,7 @@ export async function listRestaurants(rangeDays: number) {
       createdAt: r.created_at,
       totalRevenueRange: Number(r.range_revenue),
       memberSince: r.created_at,
+      churnSignals,
     };
   });
 }
@@ -343,6 +401,7 @@ export async function updateStaffFeedback(id: string, status: string, response: 
         ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_response TEXT;
         ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_responded_at TIMESTAMP;
         ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_responded_by TEXT;
+        ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP;
     `);
 
     await db.query(`

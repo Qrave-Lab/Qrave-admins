@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthJson } from "@/lib/auth/server";
 import { createRestaurantWithOwner, listRestaurants, resolveRange } from "@/lib/superadmin/queries";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function GET(request: Request) {
   const unauthorized = await requireAuthJson();
@@ -35,6 +36,22 @@ export async function POST(request: Request) {
       ownerPassword: String(body.ownerPassword || ""),
       initialTables: Number(body.initialTables || 8),
     });
+
+    const fullBrandName = `${body.brandName}${body.locationName ? ` (${body.locationName})` : ""}`;
+    await recordAuditLog({
+      action: "RESTAURANT_CREATE",
+      entityType: "restaurant",
+      entityId: created.id,
+      entityName: fullBrandName,
+      details: {
+        brand_name: body.brandName,
+        location_name: body.locationName,
+        owner_email: body.ownerEmail,
+        plan: body.plan,
+        initial_tables: body.initialTables,
+      },
+    });
+
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     if (err?.code === "23505") {

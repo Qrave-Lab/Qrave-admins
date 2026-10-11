@@ -3,21 +3,36 @@
 import { db } from "@/lib/db";
 import { requireSessionEmail } from "@/lib/auth/server";
 import { revalidatePath } from "next/cache";
+import { recordAuditLog } from "@/lib/audit";
 
-async function assertQAdminSession() {
+async function assertQAdminSession(): Promise<string> {
   const sessionEmail = await requireSessionEmail();
   if (!sessionEmail) {
     throw new Error("Unauthorized");
   }
+  return sessionEmail;
 }
 
 export async function deleteRestaurant(restaurantId: string) {
-  await assertQAdminSession();
+  const sessionEmail = await assertQAdminSession();
   try {
+    const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
+    const restName = rRes.rows[0]?.name || restaurantId;
+
     await db.query("DELETE FROM restaurant_users WHERE restaurant_id = $1", [restaurantId]);
     await db.query("DELETE FROM menu_items WHERE restaurant_id = $1", [restaurantId]);
     await db.query("DELETE FROM menu_categories WHERE restaurant_id = $1", [restaurantId]);
     await db.query("DELETE FROM restaurants WHERE id = $1", [restaurantId]);
+
+    await recordAuditLog({
+      action: "RESTAURANT_DELETE",
+      entityType: "restaurant",
+      entityId: restaurantId,
+      entityName: restName,
+      details: { deleted_restaurant_id: restaurantId, restaurant_name: restName },
+      actorUsername: sessionEmail,
+    });
+
     revalidatePath("/restaurants");
     return { success: true };
   } catch (error) {
@@ -27,167 +42,296 @@ export async function deleteRestaurant(restaurantId: string) {
 }
 
 export async function toggleRestaurantStatus(restaurantId: string, isActive: boolean) {
-    await assertQAdminSession();
-    try {
-        await db.query("UPDATE restaurants SET is_active = $1 WHERE id = $2", [isActive, restaurantId]);
-        revalidatePath("/restaurants");
-        return { success: true };
-    } catch (error) {
-        console.error("Failed to update restaurant status:", error);
-        return { success: false, error: "Failed to update status" };
-    }
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
+    const restName = rRes.rows[0]?.name || restaurantId;
+
+    await db.query("UPDATE restaurants SET is_active = $1 WHERE id = $2", [isActive, restaurantId]);
+
+    await recordAuditLog({
+      action: "RESTAURANT_STATUS_CHANGE",
+      entityType: "restaurant",
+      entityId: restaurantId,
+      entityName: restName,
+      details: {
+        new_status: isActive ? "active" : "disabled",
+        is_active: isActive,
+        restaurant_name: restName,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath("/restaurants");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update restaurant status:", error);
+    return { success: false, error: "Failed to update status" };
+  }
 }
 
-
-
 export async function addMenuItem(restaurantId: string, data: any) {
-     await assertQAdminSession();
-     try {
-        const { name, description, price, categoryId, imageUrl, isVeg, modelGlb, isAvailable } = data;
-        await db.query(
-            `INSERT INTO menu_items 
-             (restaurant_id, category_id, name, description, price, image_url, is_veg, model_glb, is_available) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [restaurantId, categoryId, name, description, price, imageUrl, isVeg, modelGlb, isAvailable]
-        );
-        revalidatePath(`/menu?restaurantId=${restaurantId}`);
-        revalidatePath("/menu");
-        return { success: true };
-    } catch (error) {
-         console.error("Failed to add menu item:", error);
-         return { success: false, error: "Failed to add menu item" };
-    }
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const { name, description, price, categoryId, imageUrl, isVeg, modelGlb, isAvailable } = data;
+    const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
+    const restName = rRes.rows[0]?.name || restaurantId;
+
+    const res = await db.query(
+      `INSERT INTO menu_items 
+        (restaurant_id, category_id, name, description, price, image_url, is_veg, model_glb, is_available) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id`,
+      [restaurantId, categoryId, name, description, price, imageUrl, isVeg, modelGlb, isAvailable]
+    );
+
+    const newItemId = res.rows[0]?.id;
+
+    await recordAuditLog({
+      action: "MENU_ITEM_CREATE",
+      entityType: "menu_item",
+      entityId: newItemId,
+      entityName: name,
+      details: {
+        restaurant_id: restaurantId,
+        restaurant_name: restName,
+        price,
+        is_veg: isVeg,
+        is_available: isAvailable,
+        category_id: categoryId,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath(`/menu?restaurantId=${restaurantId}`);
+    revalidatePath("/menu");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to add menu item:", error);
+    return { success: false, error: "Failed to add menu item" };
+  }
 }
 
 export async function updateMenuItem(restaurantId: string, itemId: string, data: any) {
-    await assertQAdminSession();
-    try {
-        const { name, description, price, categoryId, imageUrl, isVeg, modelGlb, isAvailable } = data;
-        await db.query(
-            `UPDATE menu_items 
-             SET category_id = $1, name = $2, description = $3, price = $4, image_url = $5, is_veg = $6, model_glb = $7, is_available = $8
-             WHERE id = $9 AND restaurant_id = $10`,
-            [categoryId, name, description, price, imageUrl, isVeg, modelGlb, isAvailable, itemId, restaurantId]
-        );
-        revalidatePath(`/menu?restaurantId=${restaurantId}`);
-        revalidatePath("/menu");
-        return { success: true };
-    } catch (error) {
-         console.error("Failed to update menu item:", error);
-         return { success: false, error: "Failed to update menu item" };
-    }
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const { name, description, price, categoryId, imageUrl, isVeg, modelGlb, isAvailable } = data;
+    const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
+    const restName = rRes.rows[0]?.name || restaurantId;
+
+    await db.query(
+      `UPDATE menu_items 
+       SET category_id = $1, name = $2, description = $3, price = $4, image_url = $5, is_veg = $6, model_glb = $7, is_available = $8
+       WHERE id = $9 AND restaurant_id = $10`,
+      [categoryId, name, description, price, imageUrl, isVeg, modelGlb, isAvailable, itemId, restaurantId]
+    );
+
+    await recordAuditLog({
+      action: "MENU_ITEM_UPDATE",
+      entityType: "menu_item",
+      entityId: itemId,
+      entityName: name,
+      details: {
+        restaurant_id: restaurantId,
+        restaurant_name: restName,
+        price,
+        is_veg: isVeg,
+        is_available: isAvailable,
+        category_id: categoryId,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath(`/menu?restaurantId=${restaurantId}`);
+    revalidatePath("/menu");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update menu item:", error);
+    return { success: false, error: "Failed to update menu item" };
+  }
 }
 
 export async function deleteMenuItem(itemId: string) {
-     await assertQAdminSession();
-     try {
-        await db.query("DELETE FROM menu_items WHERE id = $1", [itemId]);
-        revalidatePath("/menu");
-         return { success: true };
-    } catch (error) {
-         console.error("Failed to delete menu item:", error);
-         return { success: false, error: "Failed to delete menu item" };
-    }
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const oldRes = await db.query(
+      "SELECT name, restaurant_id FROM menu_items WHERE id = $1",
+      [itemId]
+    );
+    const itemName = oldRes.rows[0]?.name || itemId;
+    const restId = oldRes.rows[0]?.restaurant_id;
+
+    await db.query("DELETE FROM menu_items WHERE id = $1", [itemId]);
+
+    await recordAuditLog({
+      action: "MENU_ITEM_DELETE",
+      entityType: "menu_item",
+      entityId: itemId,
+      entityName: itemName,
+      details: {
+        restaurant_id: restId,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath("/menu");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete menu item:", error);
+    return { success: false, error: "Failed to delete menu item" };
+  }
 }
 
-
-
 export async function addStaff(restaurantId: string, data: any) {
-    await assertQAdminSession();
-    try {
-        const { email, name, phone, role } = data;
-        const normalizedEmail = String(email || "").trim().toLowerCase();
-        const normalizedName = String(name || "").trim();
-        const normalizedPhone = String(phone || "").trim();
-        const normalizedRole = String(role || "").trim();
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const { email, name, phone, role } = data;
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedName = String(name || "").trim();
+    const normalizedPhone = String(phone || "").trim();
+    const normalizedRole = String(role || "").trim();
 
-        if (!normalizedEmail || !normalizedName || !normalizedRole) {
-            return { success: false, error: "Name, email, and role are required" };
-        }
-        
-        let userId;
-        const userRes = await db.query("SELECT id FROM users WHERE lower(email) = $1", [normalizedEmail]);
-        if ((userRes.rowCount || 0) > 0) {
-            userId = userRes.rows[0].id;
-        } else {
-             const newUser = await db.query(
-                "INSERT INTO users (email, name, phone) VALUES ($1, $2, $3) RETURNING id",
-                [normalizedEmail, normalizedName, normalizedPhone || null]
-            );
-             userId = newUser.rows[0].id;
-        }
-
-        const existing = await db.query(
-            "SELECT 1 FROM restaurant_users WHERE restaurant_id = $1 AND user_id = $2",
-            [restaurantId, userId]
-        );
-        if ((existing.rowCount || 0) > 0) {
-            return { success: false, error: "This user is already assigned to the restaurant" };
-        }
-
-        await db.query("INSERT INTO restaurant_users (restaurant_id, user_id, role) VALUES ($1, $2, $3)", [restaurantId, userId, normalizedRole]);
-        revalidatePath(`/staff?restaurantId=${restaurantId}`);
-        return { success: true };
-
-    } catch (error: any) {
-         console.error("Failed to add staff:", error);
-        if (error?.code === "23514") {
-            return { success: false, error: "Selected role is not supported by the database" };
-        }
-        if (error?.code === "23505") {
-            return { success: false, error: "This email is already in use" };
-        }
-        return { success: false, error: "Failed to add staff" };
+    if (!normalizedEmail || !normalizedName || !normalizedRole) {
+      return { success: false, error: "Name, email, and role are required" };
     }
+
+    let userId;
+    const userRes = await db.query("SELECT id FROM users WHERE lower(email) = $1", [normalizedEmail]);
+    if ((userRes.rowCount || 0) > 0) {
+      userId = userRes.rows[0].id;
+    } else {
+      const newUser = await db.query(
+        "INSERT INTO users (email, name, phone) VALUES ($1, $2, $3) RETURNING id",
+        [normalizedEmail, normalizedName, normalizedPhone || null]
+      );
+      userId = newUser.rows[0].id;
+    }
+
+    const existing = await db.query(
+      "SELECT 1 FROM restaurant_users WHERE restaurant_id = $1 AND user_id = $2",
+      [restaurantId, userId]
+    );
+    if ((existing.rowCount || 0) > 0) {
+      return { success: false, error: "This user is already assigned to the restaurant" };
+    }
+
+    await db.query(
+      "INSERT INTO restaurant_users (restaurant_id, user_id, role) VALUES ($1, $2, $3)",
+      [restaurantId, userId, normalizedRole]
+    );
+
+    const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
+    const restName = rRes.rows[0]?.name || restaurantId;
+
+    await recordAuditLog({
+      action: "STAFF_ADD",
+      entityType: "staff",
+      entityId: userId,
+      entityName: normalizedName,
+      details: {
+        email: normalizedEmail,
+        role: normalizedRole,
+        restaurant_id: restaurantId,
+        restaurant_name: restName,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath(`/staff?restaurantId=${restaurantId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to add staff:", error);
+    if (error?.code === "23514") {
+      return { success: false, error: "Selected role is not supported by the database" };
+    }
+    if (error?.code === "23505") {
+      return { success: false, error: "This email is already in use" };
+    }
+    return { success: false, error: "Failed to add staff" };
+  }
 }
 
 export async function updateStaff(restaurantId: string, userId: string, data: any) {
-    await assertQAdminSession();
-    try {
-        const { email, name, phone, role } = data;
-        const normalizedEmail = String(email || "").trim().toLowerCase();
-        const normalizedName = String(name || "").trim();
-        const normalizedPhone = String(phone || "").trim();
-        const normalizedRole = String(role || "").trim();
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const { email, name, phone, role } = data;
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedName = String(name || "").trim();
+    const normalizedPhone = String(phone || "").trim();
+    const normalizedRole = String(role || "").trim();
 
-        if (!normalizedEmail || !normalizedName || !normalizedRole) {
-            return { success: false, error: "Name, email, and role are required" };
-        }
-        
-        await db.query(
-            "UPDATE users SET email = $1, name = $2, phone = $3 WHERE id = $4",
-            [normalizedEmail, normalizedName, normalizedPhone || null, userId]
-        );
-        
-        await db.query(
-            "UPDATE restaurant_users SET role = $1 WHERE user_id = $2 AND restaurant_id = $3",
-            [normalizedRole, userId, restaurantId]
-        );
-
-        revalidatePath(`/staff?restaurantId=${restaurantId}`);
-        return { success: true };
-
-    } catch (error: any) {
-         console.error("Failed to update staff:", error);
-        if (error?.code === "23514") {
-            return { success: false, error: "Selected role is not supported by the database" };
-        }
-        if (error?.code === "23505") {
-            return { success: false, error: "This email is already in use" };
-        }
-        return { success: false, error: "Failed to update staff" };
+    if (!normalizedEmail || !normalizedName || !normalizedRole) {
+      return { success: false, error: "Name, email, and role are required" };
     }
+
+    await db.query(
+      "UPDATE users SET email = $1, name = $2, phone = $3 WHERE id = $4",
+      [normalizedEmail, normalizedName, normalizedPhone || null, userId]
+    );
+
+    await db.query(
+      "UPDATE restaurant_users SET role = $1 WHERE user_id = $2 AND restaurant_id = $3",
+      [normalizedRole, userId, restaurantId]
+    );
+
+    const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
+    const restName = rRes.rows[0]?.name || restaurantId;
+
+    await recordAuditLog({
+      action: "STAFF_UPDATE",
+      entityType: "staff",
+      entityId: userId,
+      entityName: normalizedName,
+      details: {
+        email: normalizedEmail,
+        role: normalizedRole,
+        restaurant_id: restaurantId,
+        restaurant_name: restName,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath(`/staff?restaurantId=${restaurantId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Failed to update staff:", error);
+    if (error?.code === "23514") {
+      return { success: false, error: "Selected role is not supported by the database" };
+    }
+    if (error?.code === "23505") {
+      return { success: false, error: "This email is already in use" };
+    }
+    return { success: false, error: "Failed to update staff" };
+  }
 }
 
 export async function toggleCoupon(couponId: string, isActive: boolean) {
-     await assertQAdminSession();
-     try {
-        await db.query("UPDATE offer_campaigns SET is_active = $1 WHERE id = $2", [isActive, couponId]);
-        revalidatePath("/coupons");
-        return { success: true };
-    } catch (error) {
-         console.error("Failed to toggle coupon:", error);
-        return { success: false, error: "Failed to toggle coupon" };
-    }
+  const sessionEmail = await assertQAdminSession();
+  try {
+    const cRes = await db.query(
+      "SELECT name, code FROM offer_campaigns WHERE id = $1",
+      [couponId]
+    );
+    const couponName = cRes.rows[0]?.name || cRes.rows[0]?.code || couponId;
 
+    await db.query("UPDATE offer_campaigns SET is_active = $1 WHERE id = $2", [isActive, couponId]);
+
+    await recordAuditLog({
+      action: "COUPON_TOGGLE",
+      entityType: "coupon",
+      entityId: couponId,
+      entityName: couponName,
+      details: {
+        code: cRes.rows[0]?.code,
+        is_active: isActive,
+      },
+      actorUsername: sessionEmail,
+    });
+
+    revalidatePath("/coupons");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to toggle coupon:", error);
+    return { success: false, error: "Failed to toggle coupon" };
+  }
 }

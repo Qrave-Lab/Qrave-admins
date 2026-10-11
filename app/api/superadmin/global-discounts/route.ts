@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
 import { createGlobalDiscount, listGlobalDiscounts } from "@/lib/superadmin/queries";
+import { recordAuditLog } from "@/lib/audit";
 
 export async function GET() {
   const unauthorized = await requireAuthJson();
@@ -32,6 +33,22 @@ export async function POST(request: Request) {
       endsAt: body.endsAt ? String(body.endsAt) : null,
       createdBy: actor,
     });
+
+    await recordAuditLog({
+      action: "DISCOUNT_CREATE",
+      entityType: "discount",
+      entityId: created.id,
+      entityName: String(body.name || ""),
+      details: {
+        code: body.code || null,
+        discount_type: body.discountType,
+        discount_value: body.discountValue,
+        starts_at: body.startsAt || null,
+        ends_at: body.endsAt || null,
+      },
+      actorUsername: actor,
+    });
+
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     if (err?.code === "23505") {
@@ -41,4 +58,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "failed to create global discount" }, { status: 500 });
   }
 }
-

@@ -7,6 +7,7 @@ import OrdersChart from "@/components/OrdersChart";
 import RangeTabs from "@/components/RangeTabs";
 import RevenueChart from "@/components/RevenueChart";
 import TopBar from "@/components/TopBar";
+import RestaurantFeatureManager from "@/components/RestaurantFeatureManager";
 import {
   fetchRestaurantDetail,
   fetchRestaurantDowntimes,
@@ -241,6 +242,98 @@ export default function RestaurantDetailPage() {
         </div>
       </div>
 
+      {restaurant.churnSignals && (
+        <section className="mt-8 px-6">
+          <div className={`rounded-xl border p-6 shadow-sm ${
+            restaurant.churnSignals.riskLevel === "critical"
+              ? "border-rose-300 bg-rose-50/30"
+              : restaurant.churnSignals.riskLevel === "high"
+              ? "border-orange-300 bg-orange-50/20"
+              : restaurant.churnSignals.riskLevel === "moderate"
+              ? "border-amber-200 bg-amber-50/20"
+              : "border-gray-200 bg-white"
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                  restaurant.churnSignals.riskLevel === "critical"
+                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                    : restaurant.churnSignals.riskLevel === "high"
+                    ? "bg-orange-100 text-orange-800 border border-orange-200"
+                    : restaurant.churnSignals.riskLevel === "moderate"
+                    ? "bg-amber-100 text-amber-800 border border-amber-200"
+                    : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                }`}>
+                  {restaurant.churnSignals.riskLevel} Churn Risk
+                </span>
+                <span className="text-sm font-semibold text-gray-700">
+                  Health Index: {restaurant.churnSignals.riskScore}/100
+                </span>
+              </div>
+              <span className="text-xs text-gray-500 font-medium">
+                Automated behavioral signals evaluated in real-time
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Days Since Last Order</p>
+                <p className={`mt-2 text-2xl font-black ${
+                  (restaurant.churnSignals.daysSinceLastOrder ?? 0) >= 7 ? "text-rose-600" : "text-gray-900"
+                }`}>
+                  {restaurant.churnSignals.daysSinceLastOrder !== null
+                    ? `${restaurant.churnSignals.daysSinceLastOrder} days`
+                    : "No orders"}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  {restaurant.churnSignals.lastOrderDate
+                    ? `Last order: ${new Date(restaurant.churnSignals.lastOrderDate).toLocaleDateString()}`
+                    : "Zero lifetime orders placed"}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Dead QR Scans (7 Days)</p>
+                <p className={`mt-2 text-2xl font-black ${
+                  restaurant.churnSignals.deadQrScans7d > 0 ? "text-rose-600" : "text-gray-900"
+                }`}>
+                  {restaurant.churnSignals.deadQrScans7d} / {restaurant.churnSignals.totalQrScans7d}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {restaurant.churnSignals.totalQrScans7d > 0
+                    ? `${restaurant.churnSignals.deadQrScanRate}% abandoned sessions without ordering`
+                    : "No QR scan activity in last 7 days"}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Order Velocity Trend (7d)</p>
+                <p className={`mt-2 text-2xl font-black ${
+                  (restaurant.churnSignals.orderDropPct7d ?? 0) >= 40 ? "text-rose-600" : "text-gray-900"
+                }`}>
+                  {restaurant.churnSignals.orderDropPct7d !== null && restaurant.churnSignals.orderDropPct7d > 0
+                    ? `-${restaurant.churnSignals.orderDropPct7d}% drop`
+                    : `${restaurant.churnSignals.ordersLast7d} orders`}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {restaurant.churnSignals.ordersLast7d} orders vs {restaurant.churnSignals.ordersPrior7d} prior week
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="font-semibold text-gray-700">Trigger Reasons: </span>
+                <span className="text-gray-600">{restaurant.churnSignals.reasons.join(" · ")}</span>
+              </div>
+              <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium shrink-0">
+                Action: {restaurant.churnSignals.recommendedAction}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="mt-8 px-6">
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Restaurant Access Controls</h3>
@@ -277,6 +370,17 @@ export default function RestaurantDetailPage() {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="mt-8 px-6">
+        <RestaurantFeatureManager
+          restaurantId={id}
+          onPlanChanged={(newPlan) =>
+            setDetail((prev) =>
+              prev ? { ...prev, restaurant: { ...prev.restaurant, plan: newPlan } } : prev
+            )
+          }
+        />
       </section>
 
       {selectedFeedback && (
