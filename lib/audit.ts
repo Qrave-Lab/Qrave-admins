@@ -18,7 +18,11 @@ export type AuditAction =
   | "QADMIN_UPDATE"
   | "QADMIN_DELETE"
   | "FEEDBACK_RESPONSE"
-  | "PLAN_AND_FEATURES_UPDATE";
+  | "PLAN_AND_FEATURES_UPDATE"
+  | "BROADCAST_CREATE"
+  | "BROADCAST_UPDATE"
+  | "BROADCAST_DELETE"
+  | "RESTAURANT_WIZARD_ONBOARD";
 
 export type AuditEntityType =
   | "restaurant"
@@ -29,7 +33,8 @@ export type AuditEntityType =
   | "staff"
   | "qadmin"
   | "feedback"
-  | "plan";
+  | "plan"
+  | "broadcast";
 
 export interface RecordAuditParams {
   action: AuditAction;
