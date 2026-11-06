@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import { recordAuditLog } from "@/lib/audit";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("broadcasts.manage");
   if (unauthorized) return unauthorized;
 
   try {
@@ -66,7 +66,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("broadcasts.manage");
   if (unauthorized) return unauthorized;
 
   try {

@@ -1,10 +1,13 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
+import { cache } from "react";
 import { db } from "@/lib/db";
-import { QAdminRole, QAdminPermission, hasPermission, normalizeQAdminRole } from "@/lib/auth/roles";
+import { QAdminRole, QAdminPermission, hasPermission, normalizeQAdminRole, permissionsFor } from "@/lib/auth/roles";
+import { listBootstrapCredentials } from "@/lib/auth/credentials";
+import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
 
-export const SESSION_COOKIE = "qrave_sa_session";
+export { SESSION_COOKIE };
 
 export type SessionUser = {
   id: string;
@@ -18,65 +21,54 @@ export type FullSessionUser = {
   role: QAdminRole;
 };
 
+const BOOTSTRAP_PREFIX = "bootstrap:";
+// The platform owner's account always has full access.
+const OWNER_USERNAME = "anandu";
+
+/** The signed-in admin from the signed session cookie, or null. */
 export async function decodeSession(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-
-  try {
-    const decoded = Buffer.from(token, "base64").toString("utf-8");
-    const [id, username] = decoded.split(":");
-    if (!id || !username) return null;
-    return { id, username };
-  } catch {
-    return null;
-  }
+  const payload = await verifySession(cookieStore.get(SESSION_COOKIE)?.value);
+  return payload ? { id: payload.id, username: payload.username } : null;
 }
 
-export async function getSessionUserWithRole(): Promise<FullSessionUser | null> {
+/**
+ * The signed-in admin with their current role. Returns null when the account
+ * was removed (or its bootstrap credential was taken out of the env), so a
+ * deleted admin loses access straight away. Memoised per request.
+ */
+export const getSessionUserWithRole = cache(async (): Promise<FullSessionUser | null> => {
   const session = await decodeSession();
   if (!session) return null;
 
-  // Bootstrap account or superadmin default
-  if (session.id.startsWith("bootstrap:") || session.username.toLowerCase() === "anandu") {
-    return {
-      id: session.id,
-      username: session.username,
-      name: session.username === "anandu" ? "Anantha Krishnan" : "Bootstrap Admin",
-      role: "superadmin",
-    };
+  if (session.id.startsWith(BOOTSTRAP_PREFIX)) {
+    const username = session.id.slice(BOOTSTRAP_PREFIX.length);
+    const stillConfigured = listBootstrapCredentials().some((c) => c.username === username);
+    if (!stillConfigured) return null;
+    return { id: session.id, username, name: "Bootstrap Admin", role: "superadmin" };
   }
 
   try {
-    const { rows } = await db.query(
-      "SELECT id, username, name, role FROM superadmin_users WHERE id::text = $1 OR username = $2",
-      [session.id, session.username]
-    );
-
-    if (rows.length > 0) {
-      const r = rows[0];
-      return {
-        id: String(r.id),
-        username: String(r.username),
-        name: String(r.name || r.username),
-        role: normalizeQAdminRole(r.role),
-      };
-    }
+    const { rows } = await db.query("SELECT id, username, name, role FROM superadmin_users WHERE id::text = $1", [session.id]);
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    const username = String(r.username);
+    const isOwner = username.toLowerCase() === OWNER_USERNAME;
+    return {
+      id: String(r.id),
+      username,
+      name: String(r.name || (isOwner ? "Anantha Krishnan" : username)),
+      role: isOwner ? "superadmin" : normalizeQAdminRole(r.role),
+    };
   } catch (err) {
-    console.error("Failed to load user role:", err);
+    console.error("Failed to load admin role:", err);
+    return null;
   }
-
-  return {
-    id: session.id,
-    username: session.username,
-    name: session.username,
-    role: "ops_manager",
-  };
-}
+});
 
 export async function requireAuthJson(): Promise<NextResponse | null> {
-  const session = await decodeSession();
-  if (!session) {
+  const user = await getSessionUserWithRole();
+  if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   return null;
@@ -87,26 +79,40 @@ export async function requirePermissionJson(permission: QAdminPermission): Promi
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-
   if (!hasPermission(user.role, permission)) {
     return NextResponse.json(
-      { error: `Forbidden: role '${user.role}' lacks permission '${permission}'` },
-      { status: 403 }
+      { error: `Your role (${user.role}) doesn't have permission for this (${permission}).` },
+      { status: 403 },
     );
   }
-
   return null;
 }
 
-export async function requireAuthPage(): Promise<SessionUser> {
-  const session = await decodeSession();
-  if (!session) {
+/** For server actions: returns the admin's username, or throws when they lack the permission. */
+export async function assertPermission(permission: QAdminPermission): Promise<string> {
+  const user = await getSessionUserWithRole();
+  if (!user) throw new Error("Unauthorized");
+  if (!hasPermission(user.role, permission)) {
+    throw new Error(`Your role (${user.role}) doesn't have permission for this (${permission}).`);
+  }
+  return user.username;
+}
+
+export async function requireAuthPage(): Promise<FullSessionUser> {
+  const user = await getSessionUserWithRole();
+  if (!user) {
     redirect("/login");
   }
-  return session;
+  return user;
 }
 
 export async function requireSessionEmail(): Promise<string | null> {
-  const session = await decodeSession();
-  return session?.username || null;
+  const user = await getSessionUserWithRole();
+  return user?.username || null;
+}
+
+export async function sessionPermissions(): Promise<{ user: FullSessionUser; permissions: QAdminPermission[] } | null> {
+  const user = await getSessionUserWithRole();
+  if (!user) return null;
+  return { user, permissions: permissionsFor(user.role) };
 }

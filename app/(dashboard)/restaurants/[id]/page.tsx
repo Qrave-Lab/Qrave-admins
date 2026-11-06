@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmAction, notify } from "@/lib/ui/feedback";
+
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +10,8 @@ import RangeTabs from "@/components/RangeTabs";
 import RevenueChart from "@/components/RevenueChart";
 import TopBar from "@/components/TopBar";
 import RestaurantFeatureManager from "@/components/RestaurantFeatureManager";
+import TableQrPackModal from "@/components/TableQrPackModal";
+import { Printer, Star } from "lucide-react";
 import {
   fetchRestaurantDetail,
   fetchRestaurantDowntimes,
@@ -40,6 +44,7 @@ export default function RestaurantDetailPage() {
   const [downtimes, setDowntimes] = useState<DowntimeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState("");
+  const [qrPackOpen, setQrPackOpen] = useState(false);
 
   // Feedback Action State
   const [selectedFeedback, setSelectedFeedback] = useState<any | null>(null);
@@ -92,14 +97,23 @@ export default function RestaurantDetailPage() {
   const setRestaurantAccess = async (status: RestaurantStatus) => {
     if (!detail) return;
     const previous = detail.restaurant.status;
+    if (status === "revoked") {
+      const ok = await confirmAction({
+        title: `Revoke ${detail.restaurant.brandName}?`,
+        message: "Staff and customers lose access immediately. You can re-activate later.",
+        confirmLabel: "Revoke access",
+      });
+      if (!ok) return;
+    }
     setPending(`restaurant:${status}`);
     setDetail({ ...detail, restaurant: { ...detail.restaurant, status } });
 
     try {
       await updateRestaurantStatus(detail.restaurant.id, status);
+      notify.success(status === "active" ? "Access restored." : status === "disabled" ? "Restaurant suspended." : "Access revoked.");
     } catch {
       setDetail({ ...detail, restaurant: { ...detail.restaurant, status: previous } });
-      alert("Failed to update restaurant status");
+      notify.error("Failed to update restaurant status");
     } finally {
       setPending("");
     }
@@ -114,7 +128,7 @@ export default function RestaurantDetailPage() {
       await updateRestaurantUserStatus(id, userID, status);
     } catch {
       setUsers(snapshot);
-      alert("Failed to update user status");
+      notify.error("Failed to update user status");
     } finally {
       setPending("");
     }
@@ -142,7 +156,7 @@ export default function RestaurantDetailPage() {
         closeFeedbackModal();
     } catch (e) {
         console.error(e);
-        alert("Failed to update feedback");
+        notify.error("Failed to update feedback");
     } finally {
         setActionLoading(false);
     }
@@ -190,60 +204,59 @@ export default function RestaurantDetailPage() {
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-12">
       <TopBar
         title={
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            {restaurant.brandName} · {restaurant.locationName}
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+            {restaurant.brandName} <span className="font-semibold text-slate-400">· {restaurant.locationName}</span>
           </h1>
         }
         subtitle={
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            Subscription, revenue, users, feedback, and downtime controls
+            Subscription, users, feedback and downtime.
           </div>
         }
         rightSlot={<RangeTabs value={range} onChange={setRange} />}
       />
 
-      <div className="px-6 mt-6 mb-4 flex items-center justify-between">
+      <div className="mt-5 mb-4 flex items-center justify-between gap-3 px-4 sm:px-6 xl:px-8">
         <Link
           href="/restaurants"
-          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 -ml-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
         >
-          <span aria-hidden="true">&larr;</span> Back to Restaurants
+          <span aria-hidden="true">&larr;</span> All restaurants
         </Link>
         <span
-          className={`
-            inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold capitalize
-            ${restaurant.status === "active" ? "bg-green-100 text-green-800" : ""}
-            ${restaurant.status === "disabled" ? "bg-yellow-100 text-yellow-800" : ""}
-            ${restaurant.status === "revoked" ? "bg-red-100 text-red-800" : ""}
-            ${restaurant.status === "trial" ? "bg-indigo-100 text-indigo-800" : ""}
-            ${restaurant.status === "churn-risk" ? "bg-rose-100 text-rose-800" : ""}
-          `}
+          className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold capitalize ring-1 ring-inset ${
+            restaurant.status === "active" ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+            : restaurant.status === "disabled" ? "bg-amber-50 text-amber-800 ring-amber-600/20"
+            : restaurant.status === "revoked" ? "bg-red-50 text-red-700 ring-red-600/20"
+            : restaurant.status === "trial" ? "bg-indigo-50 text-indigo-700 ring-indigo-600/20"
+            : "bg-rose-50 text-rose-700 ring-rose-600/20"
+          }`}
         >
-          {restaurant.status}
+          {restaurant.status === "churn-risk" ? "At risk" : restaurant.status}
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 px-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Subscription Plan</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 capitalize">{restaurant.plan}</p>
+      <dl className="flex flex-wrap items-end gap-x-12 gap-y-4 px-4 sm:px-6 xl:px-8">
+        <div>
+          <dt className="text-sm font-semibold text-slate-500">Revenue ({range})</dt>
+          <dd className="mt-1 text-4xl font-bold tracking-tight tabular-nums text-slate-900">₹{totalRangeRevenue.toLocaleString("en-IN")}</dd>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Member Since</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{restaurant.memberSince}</p>
+        <div>
+          <dt className="text-sm font-semibold text-slate-500">Lifetime revenue</dt>
+          <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">₹{detail.totalRevenueLifetime.toLocaleString("en-IN")}</dd>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total Revenue ({range})</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900 text-green-600">₹{totalRangeRevenue.toLocaleString("en-IN")}</p>
+        <div>
+          <dt className="text-sm font-semibold text-slate-500">Plan</dt>
+          <dd className="mt-1 text-2xl font-bold capitalize text-slate-900">{restaurant.plan}</dd>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Lifetime Revenue</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">₹{detail.totalRevenueLifetime.toLocaleString("en-IN")}</p>
+        <div>
+          <dt className="text-sm font-semibold text-slate-500">Member since</dt>
+          <dd className="mt-1 text-2xl font-bold text-slate-900">{restaurant.memberSince}</dd>
         </div>
-      </div>
+      </dl>
 
       {restaurant.churnSignals && (
-        <section className="mt-8 px-6">
+        <section className="mt-8 px-4 sm:px-6 xl:px-8">
           <div className={`rounded-xl border p-6 shadow-sm ${
             restaurant.churnSignals.riskLevel === "critical"
               ? "border-rose-300 bg-rose-50/30"
@@ -334,7 +347,7 @@ export default function RestaurantDetailPage() {
         </section>
       )}
 
-      <section className="mt-8 px-6">
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Restaurant Access Controls</h3>
           <div className="flex items-center gap-3">
@@ -346,7 +359,7 @@ export default function RestaurantDetailPage() {
                   : "bg-green-600 text-white hover:bg-green-700 shadow-sm"
                 }`}
             >
-              Activate Access
+              Activate
             </button>
             <button
               disabled={pending.startsWith("restaurant")}
@@ -356,7 +369,7 @@ export default function RestaurantDetailPage() {
                   : "bg-amber-600 text-white hover:bg-amber-700 shadow-sm"
                 }`}
             >
-              Suspend Temporarily
+              Suspend
             </button>
             <button
               disabled={pending.startsWith("restaurant")}
@@ -366,13 +379,13 @@ export default function RestaurantDetailPage() {
                   : "bg-red-600 text-white hover:bg-red-700 shadow-sm"
                 }`}
             >
-              Revoke Permanently
+              Revoke access
             </button>
           </div>
         </div>
       </section>
 
-      <section className="mt-8 px-6">
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
         <RestaurantFeatureManager
           restaurantId={id}
           onPlanChanged={(newPlan) =>
@@ -383,8 +396,42 @@ export default function RestaurantDetailPage() {
         />
       </section>
 
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+                  <Printer size={16} />
+                </span>
+                <h3 className="text-lg font-bold text-slate-900">Table QR Codes & Print Pack</h3>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Inspect vector QR codes for all tables, export single SVGs, or launch the print-ready batch table tent pack.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setQrPackOpen(true)}
+              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition-colors"
+            >
+              <Printer size={15} />
+              <span>Open Print-Ready Table QR Pack</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {qrPackOpen && detail && (
+        <TableQrPackModal
+          restaurantId={id}
+          restaurantName={detail.restaurant.brandName || detail.restaurant.locationName || "Restaurant"}
+          onClose={() => setQrPackOpen(false)}
+        />
+      )}
+
       {selectedFeedback && (
-        <div className="fixed inset-0 bg-black/50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
             <div className="relative mx-auto p-5 border w-[500px] shadow-2xl rounded-xl bg-white">
                 <div className="flex justify-between items-start mb-6">
                     <h3 className="text-xl font-bold text-gray-900">Manage Feedback</h3>
@@ -398,13 +445,13 @@ export default function RestaurantDetailPage() {
                 
                 <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
                     <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
                             selectedFeedback.type === 'bug' ? 'bg-red-100 text-red-700' : 
                             selectedFeedback.type === 'feature_request' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'
                         }`}>
                             {selectedFeedback.type?.replace('_', ' ')}
                         </span>
-                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                         <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
                             selectedFeedback.priority === 'critical' ? 'bg-rose-600 text-white' : 
                             selectedFeedback.priority === 'high' ? 'bg-orange-500 text-white' : 'bg-green-100 text-green-700'
                         }`}>
@@ -493,7 +540,7 @@ export default function RestaurantDetailPage() {
         </section>
       </div>
 
-      <section className="mt-8 px-6">
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Restaurant Users</h3>
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -558,7 +605,7 @@ export default function RestaurantDetailPage() {
         </div>
       </section>
 
-      <section className="mt-8 px-6">
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Staff Feedback</h3>
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
@@ -575,16 +622,16 @@ export default function RestaurantDetailPage() {
                            <tr key={sf.id} className="hover:bg-gray-50 transition-colors">
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                                         sf.type === 'bug' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                                     }`}>{sf.type}</span>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                                         sf.priority === 'critical' ? 'bg-rose-600 text-white' : 'bg-orange-100 text-orange-800'
                                     }`}>{sf.priority}</span>
                                     <span className="font-bold text-gray-900 text-sm ml-1">{sf.title}</span>
                                 </div>
                                 <p className="text-sm text-gray-600 whitespace-pre-wrap mb-1">{sf.description}</p>
-                                <p className="text-[10px] text-gray-400">{new Date(sf.created_at).toLocaleDateString()}</p>
+                                <p className="text-[11px] text-gray-400">{new Date(sf.created_at).toLocaleDateString()}</p>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 align-top">
                                 {sf.user_name || 'Unknown'} <span className="text-xs text-gray-400">({sf.user_role || 'Staff'})</span>
@@ -619,7 +666,7 @@ export default function RestaurantDetailPage() {
         </div>
       </section>
 
-      <section className="mt-8 px-6">
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Customer Feedback</h3>
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -644,7 +691,7 @@ export default function RestaurantDetailPage() {
                       <td className="whitespace-nowrap px-6 py-4">
                         <span className={`inline-flex items-center px-2 py-1 rounded-md font-bold text-xs ${f.rating >= 4 ? "bg-green-100 text-green-700" : f.rating === 3 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
                           }`}>
-                          ⭐ {f.rating}/5
+                          <Star size={12} className="mr-1 fill-current" aria-hidden /> {f.rating}/5
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 capitalize">{f.source}</td>
@@ -658,7 +705,7 @@ export default function RestaurantDetailPage() {
         </div>
       </section>
 
-      <section className="mt-8 px-6">
+      <section className="mt-8 px-4 sm:px-6 xl:px-8">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Downtime Log</h3>
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">

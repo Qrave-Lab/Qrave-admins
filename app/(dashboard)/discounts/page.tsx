@@ -10,6 +10,7 @@ import {
   fetchGlobalDiscounts,
   setGlobalDiscountStatus,
 } from "@/lib/api";
+import { notify } from "@/lib/ui/feedback";
 import { CouponCampaign, CouponRedemption, GlobalDiscount } from "@/lib/types";
 
 export default function GlobalDiscountsPage() {
@@ -68,38 +69,41 @@ export default function GlobalDiscountsPage() {
   return (
     <>
       <TopBar
-        title="Global Discounts"
-        subtitle="Platform-wide offers applied to all restaurants using Qrave."
+        title="Global discounts"
+        subtitle="Platform-wide offers that apply to every restaurant."
       />
 
-      <section className="mx-auto max-w-7xl space-y-6 px-6 py-8">
-        <article className="rounded-2xl border border-white/50 bg-white/80 p-5 backdrop-blur-md">
-          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">Create Platform Discount</h3>
+      <section className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 sm:px-6 xl:px-8">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="text-base font-bold tracking-tight text-slate-900">New platform discount</h3>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-              placeholder="Offer name"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+              aria-label="Offer name" placeholder="Offer name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-              placeholder="Coupon code (optional)"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+              aria-label="Coupon code" placeholder="Coupon code (optional)"
               value={form.code}
               onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
             />
             <select
-              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              aria-label="Discount type"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
               value={form.discountType}
               onChange={(e) => setForm((f) => ({ ...f, discountType: e.target.value as "percent" | "flat" }))}
             >
-              <option value="percent">Percent</option>
-              <option value="flat">Flat</option>
+              <option value="percent">Percent off</option>
+              <option value="flat">Flat amount off (₹)</option>
             </select>
             <input
-              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
               type="number"
+              aria-label={form.discountType === "percent" ? "Percent off" : "Amount off in rupees"}
               min={1}
+              max={form.discountType === "percent" ? 100 : undefined}
               value={form.discountValue}
               onChange={(e) => setForm((f) => ({ ...f, discountValue: Number(e.target.value || 0) }))}
             />
@@ -110,7 +114,9 @@ export default function GlobalDiscountsPage() {
               className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               disabled={saving}
               onClick={async () => {
-                if (!form.name.trim() || form.discountValue <= 0) return;
+                if (!form.name.trim()) return notify.error("Give the discount a name.");
+                if (form.discountValue <= 0) return notify.error("Discount value must be more than 0.");
+                if (form.discountType === "percent" && form.discountValue > 100) return notify.error("A percent discount can't exceed 100.");
                 setSaving(true);
                 try {
                   await createGlobalDiscount({
@@ -121,18 +127,21 @@ export default function GlobalDiscountsPage() {
                   });
                   await load();
                   setForm({ name: "", code: "", discountType: "percent", discountValue: 10 });
+                  notify.success("Discount created.");
+                } catch {
+                  notify.error("Couldn't create the discount. Check the code isn't already in use.");
                 } finally {
                   setSaving(false);
                 }
               }}
             >
-              {saving ? "Saving..." : "Create Discount"}
+              {saving ? "Creating…" : "Create discount"}
             </button>
           </div>
         </article>
 
-        <article className="rounded-2xl border border-white/50 bg-white/80 p-5 backdrop-blur-md">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-700">Active & Past Global Discounts</h3>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="mb-4 text-base font-bold tracking-tight text-slate-900">Global discounts</h3>
           {loading ? (
             <div className="space-y-3 animate-pulse">
               {[1,2,3].map(i => (
@@ -163,8 +172,13 @@ export default function GlobalDiscountsPage() {
                     type="button"
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700"
                     onClick={async () => {
-                      await setGlobalDiscountStatus(row.id, !row.isActive);
-                      await load();
+                      try {
+                        await setGlobalDiscountStatus(row.id, !row.isActive);
+                        await load();
+                        notify.success(row.isActive ? "Discount paused." : "Discount activated.");
+                      } catch {
+                        notify.error("Couldn't update the discount.");
+                      }
                     }}
                   >
                     {row.isActive ? "Pause" : "Activate"}
@@ -175,9 +189,9 @@ export default function GlobalDiscountsPage() {
           )}
         </article>
 
-        <article className="rounded-2xl border border-white/50 bg-white/80 p-5 backdrop-blur-md">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">Coupon Redemptions</h3>
+            <h3 className="text-base font-bold tracking-tight text-slate-900">Coupon redemptions</h3>
             <select
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
               value={selectedCampaign}
@@ -194,15 +208,15 @@ export default function GlobalDiscountsPage() {
 
           <div className="mb-3 grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Total Redeemed</p>
+              <p className="text-xs font-semibold text-slate-500">Total Redeemed</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{redemptions.length}</p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Unique Restaurants</p>
+              <p className="text-xs font-semibold text-slate-500">Unique Restaurants</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{new Set(redemptions.map((r) => r.restaurantID)).size}</p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Total Discount Given</p>
+              <p className="text-xs font-semibold text-slate-500">Total Discount Given</p>
               <p className="mt-1 text-xl font-bold text-slate-900">₹{redemptions.reduce((s, r) => s + r.discountAmount, 0).toLocaleString("en-IN")}</p>
             </div>
           </div>
@@ -213,7 +227,7 @@ export default function GlobalDiscountsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold text-slate-500">
                     <th className="px-2 py-2">Coupon</th>
                     <th className="px-2 py-2">Campaign</th>
                     <th className="px-2 py-2">Restaurant</th>

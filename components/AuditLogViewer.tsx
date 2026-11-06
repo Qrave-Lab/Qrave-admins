@@ -28,6 +28,22 @@ interface AuditStats {
   categoryBreakdown: Record<string, number>;
 }
 
+const FOOD_COURT_BADGES: Record<string, [string, string]> = {
+  FOOD_COURT_CREATE: ["Food Court Created", "bg-emerald-50 text-emerald-700 border-emerald-200"],
+  FOOD_COURT_UPDATE: ["Food Court Edited", "bg-sky-50 text-sky-700 border-sky-200"],
+  FOOD_COURT_SUBSCRIPTION: ["Court Billing", "bg-amber-50 text-amber-700 border-amber-200"],
+  FOOD_COURT_STALL_ADD: ["Stall Added", "bg-blue-50 text-blue-700 border-blue-200"],
+  FOOD_COURT_STALL_UPDATE: ["Stall Edited", "bg-sky-50 text-sky-700 border-sky-200"],
+  FOOD_COURT_STALL_REMOVE: ["Stall Removed", "bg-red-50 text-red-700 border-red-200"],
+  FOOD_COURT_OPERATOR_ADD: ["Court Operator Added", "bg-purple-50 text-purple-700 border-purple-200"],
+  FOOD_COURT_OPERATOR_REMOVE: ["Court Operator Removed", "bg-red-50 text-red-700 border-red-200"],
+  FOOD_COURT_OPERATOR_PASSWORD: ["Operator Password Reset", "bg-rose-50 text-rose-700 border-rose-200"],
+  FOOD_COURT_QR_CREATE: ["Court QR Created", "bg-indigo-50 text-indigo-700 border-indigo-200"],
+  FOOD_COURT_QR_DELETE: ["Court QR Deleted", "bg-red-50 text-red-700 border-red-200"],
+  FOOD_COURT_AD_CREATE: ["Ad Scheduled", "bg-orange-50 text-orange-700 border-orange-200"],
+  FOOD_COURT_AD_END: ["Ad Ended", "bg-slate-100 text-slate-700 border-slate-200"],
+};
+
 export default function AuditLogViewer() {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -177,6 +193,10 @@ export default function AuditLogViewer() {
       case "FEEDBACK_RESPONSE":
         return { label: "Support Handled", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
       default:
+        if (FOOD_COURT_BADGES[action]) {
+          const [label, color] = FOOD_COURT_BADGES[action];
+          return { label, color };
+        }
         return { label: action.replace(/_/g, " "), color: "bg-slate-50 text-slate-700 border-slate-200" };
     }
   };
@@ -353,6 +373,13 @@ export default function AuditLogViewer() {
           </span>
         );
       default:
+        if (item.action.startsWith("FOOD_COURT_") && typeof details.summary === "string") {
+          return (
+            <span>
+              {details.summary} in food court <strong className="text-slate-900 font-semibold">{target}</strong>.
+            </span>
+          );
+        }
         return (
           <span>
             Performed <span className="font-medium text-slate-900">{item.action}</span> on{" "}
@@ -368,22 +395,22 @@ export default function AuditLogViewer() {
       {stats && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4.5 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Logged Actions</p>
+            <p className="text-xs font-semibold text-slate-500">Total Logged Actions</p>
             <p className="mt-1 text-2xl font-bold text-slate-900">{stats.totalActions.toLocaleString()}</p>
             <p className="mt-1 text-xs text-slate-500">Immutable ledger records</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4.5 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Actions Today</p>
+            <p className="text-xs font-semibold text-slate-500">Actions Today</p>
             <p className="mt-1 text-2xl font-bold text-orange-600">{stats.todayActions}</p>
             <p className="mt-1 text-xs text-slate-500">Recorded since midnight</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4.5 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Most Active Operator</p>
+            <p className="text-xs font-semibold text-slate-500">Most Active Operator</p>
             <p className="mt-1 text-xl font-bold text-slate-900 truncate">{stats.topQAdmin || "N/A"}</p>
             <p className="mt-1 text-xs text-slate-500">Primary audit contributor</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4.5 shadow-xs">
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Audit Scope</p>
+            <p className="text-xs font-semibold text-slate-500">Audit Scope</p>
             <p className="mt-1 text-2xl font-bold text-emerald-600">100%</p>
             <p className="mt-1 text-xs text-slate-500">Status, Menu, Discounts & Access</p>
           </div>
@@ -401,6 +428,7 @@ export default function AuditLogViewer() {
             { id: "discounts", label: "Discounts & Coupons" },
             { id: "staff", label: "Staff Management" },
             { id: "qadmins", label: "Operator Accounts" },
+            { id: "food_court", label: "Food Courts" },
           ].map((tab) => (
             <button
               key={tab.id}

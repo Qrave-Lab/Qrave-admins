@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import { setRestaurantUserStatus } from "@/lib/superadmin/queries";
 import { recordAuditLog } from "@/lib/audit";
 import { db } from "@/lib/db";
@@ -8,7 +8,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; userId: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("restaurants.status");
   if (unauthorized) return unauthorized;
 
   try {

@@ -1,5 +1,7 @@
 "use client";
 
+import { notify, confirmAction } from "@/lib/ui/feedback";
+
 import { useEffect, useState } from "react";
 import TopBar from "@/components/TopBar";
 import { QAdminUser } from "@/lib/types";
@@ -61,17 +63,18 @@ export default function QAdminsPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to permanently delete this operator account?")) return;
+    if (!(await confirmAction({ title: "Delete operator account?", message: "The operator will lose access immediately. This can't be undone.", confirmLabel: "Delete account" }))) return;
     try {
       const res = await fetch(`/api/superadmin/qadmins?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         await load();
+        notify.success("Operator account deleted.");
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to delete user");
+        notify.error(data.error || "Failed to delete user");
       }
     } catch {
-      alert("Failed to delete user");
+      notify.error("Failed to delete user");
     }
   };
 
@@ -85,12 +88,13 @@ export default function QAdminsPage() {
       if (res.ok) {
         setEditingId(null);
         await load();
+        notify.success("Operator updated.");
       } else {
         const data = await res.json();
-        alert(data.error || "Update failed");
+        notify.error(data.error || "Update failed");
       }
     } catch {
-      alert("Update failed");
+      notify.error("Update failed");
     }
   };
 
@@ -125,18 +129,18 @@ export default function QAdminsPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       <TopBar
-        title="QAdmin Access & Role-Based Permissions"
-        subtitle="Manage platform operator accounts, assign granular security roles, and enforce least-privilege policies."
+        title="QAdmin access"
+        subtitle="Operator accounts and the roles that control what each can do."
       />
 
-      <section className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+      <section className="mx-auto max-w-[1500px] space-y-6 px-4 py-6 sm:px-6 xl:px-8">
         {/* Create QAdmin Card */}
         {isSuperadmin && (
-          <article className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <article className="rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck className="w-5 h-5 text-slate-900" />
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">
-                Provision Operator Account
+              <h3 className="text-base font-bold tracking-tight text-slate-900">
+                Add operator account
               </h3>
             </div>
 
@@ -144,7 +148,7 @@ export default function QAdminsPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                   placeholder="e.g. Ramesh Kumar"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -154,7 +158,7 @@ export default function QAdminsPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Username</label>
                 <input
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                   placeholder="e.g. ramesh.ops"
                   value={form.username}
                   onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
@@ -165,7 +169,7 @@ export default function QAdminsPage() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Password</label>
                 <input
                   type="password"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                   placeholder="Min 8 characters"
                   value={form.password}
                   onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
@@ -175,7 +179,7 @@ export default function QAdminsPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Assigned Role</label>
                 <select
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                   value={form.role}
                   onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as QAdminRole }))}
                 >
@@ -194,7 +198,7 @@ export default function QAdminsPage() {
               </p>
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50 hover:bg-slate-800 transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-slate-800 transition-colors shadow-sm"
                 disabled={saving}
                 onClick={async () => {
                   setError("");
@@ -217,6 +221,7 @@ export default function QAdminsPage() {
                         role: "ops_manager",
                       });
                       await load();
+                      notify.success("Operator account created.");
                     } else {
                       const data = await res.json();
                       setError(data.error || "Failed to create operator");
@@ -228,11 +233,11 @@ export default function QAdminsPage() {
                   }
                 }}
               >
-                {saving ? "Provisioning..." : "Provision Operator"}
+                {saving ? "Adding…" : "Add operator"}
               </button>
             </div>
             {error && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2">
+              <div role="alert" className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                 <span>{error}</span>
               </div>
@@ -241,14 +246,14 @@ export default function QAdminsPage() {
         )}
 
         {/* Current QAdmins Table */}
-        <article className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <article className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">
-                Active Platform Operators ({users.length})
+              <h3 className="text-base font-bold tracking-tight text-slate-900">
+                Platform operators ({users.length})
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Accounts authorized to access the Superadmin console
+                Accounts that can sign in to this console
               </p>
             </div>
           </div>
@@ -261,8 +266,8 @@ export default function QAdminsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
+              <table className="min-w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-500 font-semibold">
                   <tr>
                     <th className="px-5 py-3.5">Name</th>
                     <th className="px-5 py-3.5">Username</th>
@@ -394,7 +399,7 @@ export default function QAdminsPage() {
         </article>
 
         {/* Permissions Capability Matrix Table */}
-        <article className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <article className="rounded-2xl border border-slate-200 bg-white p-6">
           <div className="mb-5">
             <h3 className="text-base font-bold text-slate-900">
               Role Permissions & Access Control Matrix
@@ -405,7 +410,7 @@ export default function QAdminsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full text-xs text-left divide-y divide-slate-200">
+            <table className="min-w-full text-sm text-left divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-4 py-3 font-bold uppercase tracking-wider text-slate-600">
@@ -437,6 +442,8 @@ export default function QAdminsPage() {
                   { label: "Edit Menus, Dishes & Modifiers", perm: "menu.manage" },
                   { label: "Create Coupons & Global Discounts", perm: "discounts.manage" },
                   { label: "Respond to Staff Support Tickets", perm: "tickets.respond" },
+                  { label: "Set Up & Run Food Courts", perm: "foodcourts.manage" },
+                  { label: "Publish Platform Broadcast Banners", perm: "broadcasts.manage" },
                   { label: "View Revenue & Financial Reports", perm: "finance.view" },
                   { label: "Export Accountant CSV Filings", perm: "finance.export" },
                   { label: "View Tamper-Evident Audit Trail", perm: "audit.view" },

@@ -1,5 +1,7 @@
 "use client";
 
+import { notify } from "@/lib/ui/feedback";
+
 import { useState, useEffect } from "react";
 import { toggleCoupon } from "@/lib/actions";
 
@@ -42,7 +44,7 @@ export default function CouponManager() {
             // Optimistic update or refresh
             setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active: newStatus } : c));
         } catch (error) {
-            alert("Failed to update coupon status");
+            notify.error("Failed to update coupon status");
         }
     };
 

@@ -38,7 +38,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-slate-50 select-none">
+    <main className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-slate-50">
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -61,10 +61,10 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+          <form onSubmit={handleLogin} aria-busy={loading} className="flex flex-col gap-5">
             {/* Username Input */}
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-semibold text-slate-700 ml-0.5">
+              <label htmlFor="username" className="text-xs font-semibold text-slate-700 ml-0.5">
                 Username
               </label>
               <div className="relative flex items-center">
@@ -72,6 +72,7 @@ export default function LoginPage() {
                   <User size={18} />
                 </div>
                 <input
+                  id="username"
                   type="text"
                   className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all duration-150"
                   placeholder="Username"
@@ -87,7 +88,7 @@ export default function LoginPage() {
 
             {/* Password Input */}
             <div className="flex flex-col gap-2 group">
-              <label className="text-xs font-semibold text-slate-700 ml-0.5">
+              <label htmlFor="password" className="text-xs font-semibold text-slate-700 ml-0.5">
                 Password
               </label>
               <div className="relative flex items-center">
@@ -95,6 +96,7 @@ export default function LoginPage() {
                   <Lock size={18} />
                 </div>
                 <input
+                  id="password"
                   type={showPassword ? "text" : "password"}
                   className="w-full pl-11 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all duration-150"
                   placeholder="Password"
@@ -106,7 +108,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors focus:outline-none p-1"
+                  className="absolute right-3.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors p-1 rounded-md"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -125,7 +127,7 @@ export default function LoginPage() {
             >
               {loading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div aria-hidden className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Signing in...</span>
                 </>
               ) : (
@@ -145,7 +147,8 @@ export default function LoginPage() {
                 animate={{ opacity: 1, y: 0, height: "auto" }}
                 exit={{ opacity: 0, y: -4, height: 0 }}
                 transition={{ duration: 0.15 }}
-                className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2"
+                role="alert"
+                className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2"
               >
                 <AlertCircle size={15} className="shrink-0 text-red-600 mt-0.5" />
                 <span className="leading-snug font-medium">{error}</span>

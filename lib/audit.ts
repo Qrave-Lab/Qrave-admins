@@ -22,7 +22,20 @@ export type AuditAction =
   | "BROADCAST_CREATE"
   | "BROADCAST_UPDATE"
   | "BROADCAST_DELETE"
-  | "RESTAURANT_WIZARD_ONBOARD";
+  | "RESTAURANT_WIZARD_ONBOARD"
+  | "FOOD_COURT_CREATE"
+  | "FOOD_COURT_UPDATE"
+  | "FOOD_COURT_SUBSCRIPTION"
+  | "FOOD_COURT_STALL_ADD"
+  | "FOOD_COURT_STALL_UPDATE"
+  | "FOOD_COURT_STALL_REMOVE"
+  | "FOOD_COURT_OPERATOR_ADD"
+  | "FOOD_COURT_OPERATOR_REMOVE"
+  | "FOOD_COURT_OPERATOR_PASSWORD"
+  | "FOOD_COURT_QR_CREATE"
+  | "FOOD_COURT_QR_DELETE"
+  | "FOOD_COURT_AD_CREATE"
+  | "FOOD_COURT_AD_END";
 
 export type AuditEntityType =
   | "restaurant"
@@ -34,7 +47,8 @@ export type AuditEntityType =
   | "qadmin"
   | "feedback"
   | "plan"
-  | "broadcast";
+  | "broadcast"
+  | "food_court";
 
 export interface RecordAuditParams {
   action: AuditAction;

@@ -61,6 +61,11 @@ export function normalizePriority(raw: string | null | undefined): TicketPriorit
 export function formatSlaMinutes(mins: number): string {
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
+  if (hours >= 48) {
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return remHours === 0 ? `${days}d` : `${days}d ${remHours}h`;
+  }
   const remainingMins = mins % 60;
   if (remainingMins === 0) return `${hours}h`;
   return `${hours}h ${remainingMins}m`;
@@ -136,7 +141,7 @@ export function evaluateTicketSla(ticket: {
       badgeClass = "bg-rose-100 text-rose-800 border border-rose-200 animate-pulse";
     } else if (remaining <= 30) {
       responseStatus = "approaching_breach";
-      badgeText = `⚠️ SLA Due in ${formatMinutes(remaining)}`;
+      badgeText = `SLA due in ${formatMinutes(remaining)}`;
       badgeClass = "bg-orange-100 text-orange-800 border border-orange-200";
     } else {
       responseStatus = "within_sla";

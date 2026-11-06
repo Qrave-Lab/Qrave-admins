@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireAuthJson, requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import { recordAuditLog } from "@/lib/audit";
 
 export async function GET(request: Request) {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("broadcasts.manage");
   if (unauthorized) return unauthorized;
 
   try {

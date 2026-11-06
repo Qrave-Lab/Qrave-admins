@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
+import BroadcastBannerManager from "@/components/BroadcastBannerManager";
 import { fetchOperations } from "@/lib/api";
 import { PlatformOperations } from "@/lib/types";
 
@@ -12,6 +13,7 @@ const tabs = [
   { id: "tickets", label: "Tickets" },
   { id: "downtime", label: "Downtime" },
   { id: "discounts", label: "Discounts" },
+  { id: "broadcasts", label: "Broadcast banners" },
 ] as const;
 
 type OperationsTab = (typeof tabs)[number]["id"];
@@ -93,7 +95,7 @@ export default function OperationsPage() {
   if (loading || !filtered) {
     return (
       <>
-        <TopBar title="Operations Control" subtitle="Real-time platform visibility across payments, orders, support tickets, downtime, and promotions." />
+        <TopBar title="Operations" subtitle="Live view of payments, orders, support tickets and downtime." />
         <div className="mx-auto max-w-7xl space-y-6 px-6 py-8 animate-pulse">
           <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             {[1,2,3,4,5].map(i => (
@@ -122,60 +124,42 @@ export default function OperationsPage() {
   return (
     <>
       <TopBar
-        title="Operations Control"
-        subtitle="Real-time platform visibility across payments, orders, support tickets, downtime, and promotions."
+        title="Operations"
+        subtitle="Live view of payments, orders, support tickets and downtime."
       />
 
-      <section className="mx-auto max-w-7xl space-y-6 px-6 py-8">
-        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Live Restaurants</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.restaurantCount}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Menu Items</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.menuItemCount}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Open Tickets</p>
-            <p className="mt-2 text-2xl font-bold text-rose-700">{summary.openTickets}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Paid Payments Today</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.paidPaymentsToday}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Volume Today</p>
-            <p className="mt-2 text-2xl font-bold text-emerald-700">₹{summary.paymentVolumeToday.toLocaleString("en-IN")}</p>
-          </article>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-4">
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today&apos;s Orders</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.todayOrders}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today&apos;s Takeaway</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.todayTakeawayOrders}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Coupons</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.activeCoupons}</p>
-          </article>
-          <article className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Global Discounts</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{summary.activeGlobalDiscounts}</p>
-          </article>
+      <section className="mx-auto max-w-[1500px] space-y-6 px-4 sm:px-6 xl:px-8 py-6">
+        <div className="grid gap-x-12 gap-y-6 lg:grid-cols-2">
+          <section aria-labelledby="today-heading">
+            <h2 id="today-heading" className="mb-3 text-sm font-semibold text-slate-500">Today</h2>
+            <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
+              <div><dt className="text-xs font-semibold text-slate-500">Orders</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.todayOrders}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Takeaway</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.todayTakeawayOrders}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Payments paid</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.paidPaymentsToday}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Volume</dt><dd className="text-2xl font-bold tabular-nums text-emerald-700">₹{summary.paymentVolumeToday.toLocaleString("en-IN")}</dd></div>
+            </dl>
+          </section>
+          <section aria-labelledby="platform-heading">
+            <h2 id="platform-heading" className="mb-3 text-sm font-semibold text-slate-500">Platform</h2>
+            <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-5">
+              <div><dt className="text-xs font-semibold text-slate-500">Restaurants</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.restaurantCount}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Menu items</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.menuItemCount}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Open tickets</dt><dd className={`text-2xl font-bold tabular-nums ${summary.openTickets > 0 ? "text-rose-700" : "text-slate-900"}`}>{summary.openTickets}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Coupons</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.activeCoupons}</dd></div>
+              <div><dt className="text-xs font-semibold text-slate-500">Global discounts</dt><dd className="text-2xl font-bold tabular-nums text-slate-900">{summary.activeGlobalDiscounts}</dd></div>
+            </dl>
+          </section>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
+            <div role="tablist" aria-label="Operations data" className="flex flex-wrap gap-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                     activeTab === tab.id
@@ -188,8 +172,9 @@ export default function OperationsPage() {
               ))}
             </div>
             <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm lg:max-w-sm"
-              placeholder="Search active table"
+              aria-label="Search active table"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 lg:max-w-sm"
+              placeholder="Search this table"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -199,7 +184,7 @@ export default function OperationsPage() {
             {activeTab === "payments" && (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold text-slate-500">
                     <th className="px-2 py-2">Restaurant</th>
                     <th className="px-2 py-2">Payment</th>
                     <th className="px-2 py-2">Order</th>
@@ -228,7 +213,7 @@ export default function OperationsPage() {
             {activeTab === "orders" && (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold text-slate-500">
                     <th className="px-2 py-2">Restaurant</th>
                     <th className="px-2 py-2">Order</th>
                     <th className="px-2 py-2">Session</th>
@@ -257,7 +242,7 @@ export default function OperationsPage() {
             {activeTab === "takeaway" && (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold text-slate-500">
                     <th className="px-2 py-2">Restaurant</th>
                     <th className="px-2 py-2">Order</th>
                     <th className="px-2 py-2">Type</th>
@@ -286,7 +271,7 @@ export default function OperationsPage() {
             {activeTab === "tickets" && (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold text-slate-500">
                     <th className="px-2 py-2">Restaurant</th>
                     <th className="px-2 py-2">Title</th>
                     <th className="px-2 py-2">Type</th>
@@ -318,7 +303,7 @@ export default function OperationsPage() {
             {activeTab === "downtime" && (
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs font-semibold text-slate-500">
                     <th className="px-2 py-2">Restaurant</th>
                     <th className="px-2 py-2">Reason</th>
                     <th className="px-2 py-2">Severity</th>
@@ -349,7 +334,7 @@ export default function OperationsPage() {
                   <div className="overflow-hidden rounded-xl border border-slate-200">
                     <table className="min-w-full text-sm">
                       <thead className="bg-slate-50">
-                        <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr className="text-left text-xs font-semibold text-slate-500">
                           <th className="px-3 py-2">Restaurant</th>
                           <th className="px-3 py-2">Campaign</th>
                           <th className="px-3 py-2">Code</th>
@@ -373,7 +358,7 @@ export default function OperationsPage() {
                   <div className="overflow-hidden rounded-xl border border-slate-200">
                     <table className="min-w-full text-sm">
                       <thead className="bg-slate-50">
-                        <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                        <tr className="text-left text-xs font-semibold text-slate-500">
                           <th className="px-3 py-2">Name</th>
                           <th className="px-3 py-2">Code</th>
                           <th className="px-3 py-2">Discount</th>
@@ -395,6 +380,12 @@ export default function OperationsPage() {
                     </table>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === "broadcasts" && (
+              <div className="pt-2">
+                <BroadcastBannerManager restaurants={data?.restaurants || []} />
               </div>
             )}
           </div>

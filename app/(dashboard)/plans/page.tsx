@@ -9,12 +9,10 @@ import { fetchRestaurants } from "@/lib/api";
 import { RestaurantSummary } from "@/lib/types";
 import {
   SlidersHorizontal,
-  Sparkles,
   Check,
   X,
   Search,
   Clock,
-  Layers,
   ExternalLink,
   ChevronRight,
   Filter,
@@ -129,14 +127,14 @@ export default function PlansAndFlagsPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       <TopBar
-        title="Subscription Plans & Feature Gating"
-        subtitle="Manage SaaS tier matrices, grant instant trial extensions, and override feature flags per restaurant"
+        title="Plans & flags"
+        subtitle="Plan tiers, trial extensions and per-restaurant feature overrides."
         rightSlot={
           <div className="flex items-center gap-3">
             <button
               onClick={() => void loadData()}
               className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-              title="Refresh Plan Data"
+              title="Refresh plan data"
             >
               <RotateCw className="w-3.5 h-3.5" />
               Refresh
@@ -146,64 +144,38 @@ export default function PlansAndFlagsPage() {
               className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              Manage Restaurant Flags
+              Manage restaurant flags
             </button>
           </div>
         }
       />
 
-      <div className="px-6 py-6 max-w-7xl mx-auto space-y-6">
-        {/* Metric Cards Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Available Tiers
-              </span>
-              <Layers className="w-4 h-4 text-slate-400" />
-            </div>
-            <p className="mt-3 text-2xl font-bold text-slate-900">{plans.length} Tiers</p>
-            <p className="mt-1 text-xs text-slate-500">Starter, Growth, Pro, Enterprise</p>
+      <div className="px-4 sm:px-6 xl:px-8 py-6 max-w-[1500px] mx-auto space-y-6">
+        <dl className="flex flex-wrap items-baseline gap-x-10 gap-y-3">
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Plan tiers</dt>
+            <dd className="text-2xl font-bold tabular-nums text-slate-900">{plans.length}</dd>
           </div>
-
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Feature Flags
-              </span>
-              <Sparkles className="w-4 h-4 text-orange-500" />
-            </div>
-            <p className="mt-3 text-2xl font-bold text-slate-900">{features.length} Flags</p>
-            <p className="mt-1 text-xs text-slate-500">Instant toggle across mobile & web</p>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Feature flags</dt>
+            <dd className="text-2xl font-bold tabular-nums text-slate-900">{features.length}</dd>
           </div>
-
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Active Trials
-              </span>
-              <Clock className="w-4 h-4 text-blue-500" />
-            </div>
-            <p className="mt-3 text-2xl font-bold text-blue-600">{activeTrialsCount} Restaurants</p>
-            <p className="mt-1 text-xs text-slate-500">Temporary premium feature access</p>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Active trials</dt>
+            <dd className="text-2xl font-bold tabular-nums text-blue-700">{activeTrialsCount}</dd>
           </div>
-
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                Custom Overrides
-              </span>
-              <SlidersHorizontal className="w-4 h-4 text-emerald-500" />
-            </div>
-            <p className="mt-3 text-2xl font-bold text-slate-900">{customOverridesCount} Configured</p>
-            <p className="mt-1 text-xs text-slate-500">Custom flag rules or discounts</p>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">Restaurants with overrides</dt>
+            <dd className="text-2xl font-bold tabular-nums text-slate-900">{customOverridesCount}</dd>
           </div>
-        </div>
+        </dl>
 
         {/* Tab Controls */}
         <div className="flex items-center justify-between border-b border-slate-200 pt-2 pb-0">
-          <div className="flex gap-2">
+          <div role="tablist" aria-label="Plans sections" className="flex gap-2">
             <button
+              role="tab"
+              aria-selected={activeTab === "tiers"}
               onClick={() => setActiveTab("tiers")}
               className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
                 activeTab === "tiers"
@@ -211,9 +183,11 @@ export default function PlansAndFlagsPage() {
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              Subscription Tier Matrix
+              Plan tiers
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === "overrides"}
               onClick={() => setActiveTab("overrides")}
               className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
                 activeTab === "overrides"
@@ -221,12 +195,14 @@ export default function PlansAndFlagsPage() {
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              Active Overrides & Trials
+              Overrides and trials
               <span className="px-1.5 py-0.5 text-xs font-bold rounded-full bg-slate-100 text-slate-700">
                 {overrides.length}
               </span>
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === "catalog"}
               onClick={() => setActiveTab("catalog")}
               className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
                 activeTab === "catalog"
@@ -234,7 +210,7 @@ export default function PlansAndFlagsPage() {
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              Feature Catalog & SDK Gates
+              Feature catalog
             </button>
           </div>
         </div>
@@ -247,10 +223,10 @@ export default function PlansAndFlagsPage() {
           </div>
         )}
 
-        {/* Tab 1: Subscription Tier Matrix */}
+        {/* Tab 1: Plan tiers */}
         {activeTab === "tiers" && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">Standard Plan Tier Catalog</h3>
@@ -275,12 +251,12 @@ export default function PlansAndFlagsPage() {
                       }`}
                     >
                       {isPro && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-orange-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-orange-600 text-white text-[11px] font-bold uppercase tracking-wider rounded-full shadow-sm">
                           Most Popular
                         </div>
                       )}
                       {isEnterprise && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider rounded-full shadow-sm">
                           Full Platform
                         </div>
                       )}
@@ -288,7 +264,7 @@ export default function PlansAndFlagsPage() {
                       <div>
                         <div className="flex items-center justify-between">
                           <h4 className="text-base font-bold text-slate-900">{p.name}</h4>
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                          <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                             {p.id}
                           </span>
                         </div>
@@ -355,7 +331,7 @@ export default function PlansAndFlagsPage() {
           </div>
         )}
 
-        {/* Tab 2: Active Overrides & Trials */}
+        {/* Tab 2: Overrides and trials */}
         {activeTab === "overrides" && (
           <div className="space-y-4">
             {/* Search and Filters */}
@@ -364,16 +340,17 @@ export default function PlansAndFlagsPage() {
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search restaurants, plans, notes..."
+                  aria-label="Search overrides" placeholder="Search restaurants, plans, notes"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white"
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-900 focus:bg-white"
                 />
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Filter className="w-3.5 h-3.5 text-slate-400" />
                 <select
+                  aria-label="Filter overrides"
                   value={trialFilter}
                   onChange={(e: any) => setTrialFilter(e.target.value)}
                   className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-900"
@@ -388,16 +365,16 @@ export default function PlansAndFlagsPage() {
             {/* Overrides Table */}
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
                   <thead className="bg-slate-50">
                     <tr>
-                      <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-slate-500">Restaurant</th>
-                      <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-slate-500">Effective Plan</th>
-                      <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-slate-500">Trial Status</th>
-                      <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-slate-500">Feature Overrides</th>
-                      <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-slate-500">Internal Notes</th>
-                      <th className="px-5 py-3.5 font-bold uppercase tracking-wider text-slate-500">Updated</th>
-                      <th className="px-5 py-3.5 text-right font-bold uppercase tracking-wider text-slate-500">Action</th>
+                      <th className="px-5 py-3.5 font-semibold text-slate-500">Restaurant</th>
+                      <th className="px-5 py-3.5 font-semibold text-slate-500">Effective Plan</th>
+                      <th className="px-5 py-3.5 font-semibold text-slate-500">Trial Status</th>
+                      <th className="px-5 py-3.5 font-semibold text-slate-500">Feature Overrides</th>
+                      <th className="px-5 py-3.5 font-semibold text-slate-500">Internal Notes</th>
+                      <th className="px-5 py-3.5 font-semibold text-slate-500">Updated</th>
+                      <th className="px-5 py-3.5 text-right font-semibold text-slate-500">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
@@ -407,7 +384,7 @@ export default function PlansAndFlagsPage() {
                           <SlidersHorizontal className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                           <p className="font-medium text-slate-600">No matching overrides found</p>
                           <p className="text-xs text-slate-400 mt-1">
-                            Click &ldquo;Manage Restaurant Flags&rdquo; above to assign a custom tier or trial.
+                            Click &ldquo;Manage restaurant flags&rdquo; above to assign a custom tier or trial.
                           </p>
                         </td>
                       </tr>
@@ -428,7 +405,7 @@ export default function PlansAndFlagsPage() {
                                 {row.restaurantName}
                                 <ExternalLink className="w-3 h-3 text-slate-400" />
                               </Link>
-                              <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                              <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
                                 {row.restaurantId}
                               </span>
                             </td>
@@ -448,7 +425,7 @@ export default function PlansAndFlagsPage() {
                                   </span>
                                 </div>
                               ) : row.trialEndsAt ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-400">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-400">
                                   Trial Expired
                                 </span>
                               ) : (
@@ -463,7 +440,7 @@ export default function PlansAndFlagsPage() {
                                     return (
                                       <span
                                         key={k}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
                                       >
                                         <Check className="w-2.5 h-2.5" />
                                         {feat?.name || k}
@@ -481,7 +458,7 @@ export default function PlansAndFlagsPage() {
                             <td className="px-5 py-4 text-slate-500 whitespace-nowrap">
                               <div>{new Date(row.updatedAt).toLocaleDateString()}</div>
                               {row.updatedBy && (
-                                <div className="text-[10px] text-slate-400">by {row.updatedBy}</div>
+                                <div className="text-[11px] text-slate-400">by {row.updatedBy}</div>
                               )}
                             </td>
                             <td className="px-5 py-4 text-right">
@@ -504,10 +481,10 @@ export default function PlansAndFlagsPage() {
           </div>
         )}
 
-        {/* Tab 3: Feature Catalog & SDK Gates */}
+        {/* Tab 3: Feature catalog */}
         {activeTab === "catalog" && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
               <div className="mb-6">
                 <h3 className="text-base font-bold text-slate-900">Feature Gate Directory & SDK Usage</h3>
                 <p className="text-xs text-slate-500 mt-1">
@@ -530,7 +507,7 @@ export default function PlansAndFlagsPage() {
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-bold text-sm text-slate-900">{f.name}</span>
                           <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                            className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                               f.category === "catalog"
                                 ? "bg-slate-100 text-slate-700"
                                 : f.category === "marketing"
@@ -555,10 +532,10 @@ export default function PlansAndFlagsPage() {
                       </div>
 
                       <div className="mt-3 pt-3 border-t border-slate-100 bg-slate-50/80 -mx-4 -mb-4 px-4 py-2.5 rounded-b-xl flex items-center justify-between">
-                        <span className="text-[10px] font-mono text-slate-500 truncate">
+                        <span className="text-[11px] font-mono text-slate-500 truncate">
                           key: &ldquo;{f.key}&rdquo;
                         </span>
-                        <span className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1">
+                        <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" /> Live Gated
                         </span>
                       </div>
@@ -593,7 +570,7 @@ if (features.ar_menu_3d) {
 
       {/* Select Restaurant Modal (to manage flags for any restaurant) */}
       {showSelectModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -621,7 +598,7 @@ if (features.ar_menu_3d) {
                 value={modalSearch}
                 onChange={(e) => setModalSearch(e.target.value)}
                 autoFocus
-                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-900 focus:bg-white"
               />
             </div>
 
@@ -643,10 +620,10 @@ if (features.ar_menu_3d) {
                       <div className="font-semibold text-xs text-slate-900 group-hover:text-orange-600 transition-colors">
                         {r.brandName} · {r.locationName}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">{r.id}</div>
+                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">{r.id}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">
                         {r.plan}
                       </span>
                       <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-600" />
@@ -661,11 +638,11 @@ if (features.ar_menu_3d) {
 
       {/* Embedded Feature Manager Modal */}
       {managingRestaurantId && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full p-6 shadow-2xl my-8 relative">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Feature Flag Editor
                 </span>
                 <h3 className="text-lg font-bold text-slate-900">{selectedRestaurantName}</h3>

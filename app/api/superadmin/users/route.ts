@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requirePermissionJson } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
-    const unauthorized = await requireAuthJson();
+    const unauthorized = await requirePermissionJson("qadmins.manage");
     if (unauthorized) return unauthorized;
 
     try {

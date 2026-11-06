@@ -30,52 +30,39 @@ export default function RevenuePage() {
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-16">
       <TopBar
         title={
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Revenue Analytics & Accountant Reconciliation
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">Revenue</h1>
         }
         subtitle={
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            Total revenue, transaction flow, tax schedules, and financial exports
+            Revenue, orders, tax schedules and accountant exports.
           </div>
         }
         rightSlot={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setExportOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-3.5 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              Export for Accountant
+              Export for accountant
             </button>
             <RangeTabs value={range} onChange={setRange} />
           </div>
         }
       />
 
-      {/* KPI Cards */}
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 px-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Total Revenue ({range})
-          </p>
-          <p className="mt-4 text-4xl font-black text-gray-900 tabular-nums">
-            <span className="text-gray-400 mr-2 text-3xl">₹</span>
-            {totalRevenue.toLocaleString("en-IN")}
-          </p>
+      <dl className="mt-6 flex flex-wrap items-end gap-x-12 gap-y-4 px-4 sm:px-6 xl:px-8">
+        <div>
+          <dt className="text-sm font-semibold text-slate-500">Revenue ({range})</dt>
+          <dd className="mt-1 text-4xl font-bold tracking-tight tabular-nums text-slate-900">₹{totalRevenue.toLocaleString("en-IN")}</dd>
         </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Total Orders ({range})
-          </p>
-          <p className="mt-4 text-4xl font-black text-gray-900 tabular-nums">
-            {totalOrders.toLocaleString("en-IN")}
-          </p>
+        <div>
+          <dt className="text-sm font-semibold text-slate-500">Orders ({range})</dt>
+          <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{totalOrders.toLocaleString("en-IN")}</dd>
         </div>
-      </div>
+      </dl>
 
-      <div className="mt-8 px-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="mt-6 px-4 sm:px-6 xl:px-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Revenue Trend */}
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">

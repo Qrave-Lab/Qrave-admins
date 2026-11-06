@@ -1,5 +1,9 @@
 "use client";
 
+import { AlertTriangle, Headphones, ShieldCheck, Zap } from "lucide-react";
+
+import { notify } from "@/lib/ui/feedback";
+
 import { useEffect, useMemo, useState } from "react";
 import AuditLogViewer from "@/components/AuditLogViewer";
 import type { SlaSummaryMetrics, TicketSlaDetails } from "@/lib/sla";
@@ -157,7 +161,7 @@ export default function LogViewer() {
             closeManage();
         } catch (error) {
             console.error(error);
-            alert("Failed to manage feedback");
+            notify.error("Failed to manage feedback");
         } finally {
             setSaving(false);
         }
@@ -167,34 +171,34 @@ export default function LogViewer() {
         <div className="space-y-6">
             <div className="flex border-b border-slate-200 gap-2 bg-white px-5 py-3 rounded-xl border shadow-xs">
                 <button
-                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
                         activeTab === "audit"
                             ? "bg-slate-900 text-white shadow-xs"
                             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                     onClick={() => setActiveTab("audit")}
                 >
-                    🛡️ Audit Trail
+                    <ShieldCheck size={15} aria-hidden /> Audit trail
                 </button>
                 <button
-                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
                         activeTab === "feedback"
                             ? "bg-slate-900 text-white shadow-xs"
                             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                     onClick={() => setActiveTab("feedback")}
                 >
-                    🎧 Support & SLA Radar
+                    <Headphones size={15} aria-hidden /> Support and SLA
                 </button>
                 <button
-                    className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
                         activeTab === "downtime"
                             ? "bg-slate-900 text-white shadow-xs"
                             : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     }`}
                     onClick={() => setActiveTab("downtime")}
                 >
-                    ⚡ Downtime Events
+                    <Zap size={15} aria-hidden /> Downtime events
                 </button>
             </div>
 
@@ -206,13 +210,13 @@ export default function LogViewer() {
                     {slaMetrics && slaMetrics.breachedCount > 0 && (
                         <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-rose-900 flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3">
-                                <span className="text-2xl leading-none">⚠️</span>
+                                <AlertTriangle size={22} className="shrink-0 text-rose-600" aria-hidden />
                                 <div>
                                     <h4 className="font-bold text-sm text-rose-950">
-                                        Support SLA Alert: {slaMetrics.breachedCount} {slaMetrics.breachedCount === 1 ? "Ticket Exceeds" : "Tickets Exceed"} SLA Commitments
+                                        {slaMetrics.breachedCount} {slaMetrics.breachedCount === 1 ? "ticket has" : "tickets have"} breached the support SLA
                                     </h4>
                                     <p className="text-xs text-rose-800 mt-0.5">
-                                        Response or resolution times have surpassed operational SLA thresholds. Immediate attention required to maintain client retention.
+                                        Response or resolution time went past the SLA threshold. Review these first.
                                     </p>
                                 </div>
                             </div>
@@ -220,7 +224,7 @@ export default function LogViewer() {
                                 onClick={() => setSlaFilter("breached")}
                                 className="px-3 py-1.5 text-xs font-bold bg-rose-600 text-white rounded-lg hover:bg-rose-700 whitespace-nowrap transition-colors"
                             >
-                                View Breached ({slaMetrics.breachedCount})
+                                Show breached ({slaMetrics.breachedCount})
                             </button>
                         </div>
                     )}
@@ -229,8 +233,8 @@ export default function LogViewer() {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Compliance Rate</span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                <span className="text-xs font-semibold text-slate-500">Compliance Rate</span>
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
                                     (slaMetrics?.complianceRate ?? 100) >= 90
                                         ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                                         : (slaMetrics?.complianceRate ?? 100) >= 75
@@ -240,7 +244,7 @@ export default function LogViewer() {
                                     Target: ≥95%
                                 </span>
                             </div>
-                            <div className="mt-2 text-2xl font-black text-slate-900">
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
                                 {slaMetrics ? `${slaMetrics.complianceRate}%` : "—"}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
@@ -250,8 +254,8 @@ export default function LogViewer() {
 
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Breached Tickets</span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                <span className="text-xs font-semibold text-slate-500">Breached Tickets</span>
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
                                     (slaMetrics?.breachedCount ?? 0) > 0
                                         ? "bg-rose-50 text-rose-800 border-rose-200"
                                         : "bg-emerald-50 text-emerald-800 border-emerald-200"
@@ -259,7 +263,7 @@ export default function LogViewer() {
                                     {(slaMetrics?.breachedCount ?? 0) > 0 ? "Urgent Action" : "Zero Breaches"}
                                 </span>
                             </div>
-                            <div className="mt-2 text-2xl font-black text-slate-900">
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
                                 {slaMetrics?.breachedCount ?? 0}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
@@ -269,8 +273,8 @@ export default function LogViewer() {
 
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Due Soon (&lt;30m)</span>
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                <span className="text-xs font-semibold text-slate-500">Due Soon (&lt;30m)</span>
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
                                     (slaMetrics?.approachingCount ?? 0) > 0
                                         ? "bg-orange-50 text-orange-800 border-orange-200"
                                         : "bg-slate-100 text-slate-700 border-slate-200"
@@ -278,7 +282,7 @@ export default function LogViewer() {
                                     {(slaMetrics?.approachingCount ?? 0) > 0 ? "Expedite" : "Nominal"}
                                 </span>
                             </div>
-                            <div className="mt-2 text-2xl font-black text-slate-900">
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
                                 {slaMetrics?.approachingCount ?? 0}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
@@ -288,12 +292,12 @@ export default function LogViewer() {
 
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg First Response</span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-800 border-blue-200">
+                                <span className="text-xs font-semibold text-slate-500">Avg First Response</span>
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded border bg-blue-50 text-blue-800 border-blue-200">
                                     FRT Mean
                                 </span>
                             </div>
-                            <div className="mt-2 text-2xl font-black text-slate-900">
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
                                 {slaMetrics ? formatSlaMinutes(slaMetrics.avgResponseMinutes) : "—"}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
@@ -303,12 +307,12 @@ export default function LogViewer() {
 
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg Resolution</span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-purple-50 text-purple-800 border-purple-200">
+                                <span className="text-xs font-semibold text-slate-500">Avg Resolution</span>
+                                <span className="text-[11px] font-bold px-2 py-0.5 rounded border bg-purple-50 text-purple-800 border-purple-200">
                                     MTTR
                                 </span>
                             </div>
-                            <div className="mt-2 text-2xl font-black text-slate-900">
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
                                 {slaMetrics ? formatSlaMinutes(slaMetrics.avgResolutionMinutes) : "—"}
                             </div>
                             <p className="mt-1 text-xs text-slate-500">
@@ -338,8 +342,8 @@ export default function LogViewer() {
                                         : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
                                 }`}
                             >
-                                <span>⚠️ Breached</span>
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-100 text-rose-800">
+                                <span className="inline-flex items-center gap-1"><AlertTriangle size={13} aria-hidden /> Breached</span>
+                                <span className="px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800">
                                     {slaMetrics?.breachedCount ?? 0}
                                 </span>
                             </button>
@@ -352,7 +356,7 @@ export default function LogViewer() {
                                 }`}
                             >
                                 <span>⏱️ Approaching</span>
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-orange-100 text-orange-800">
+                                <span className="px-1.5 py-0.2 rounded-full text-[11px] font-bold bg-orange-100 text-orange-800">
                                     {slaMetrics?.approachingCount ?? 0}
                                 </span>
                             </button>
@@ -398,13 +402,13 @@ export default function LogViewer() {
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-40">
+                                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 w-40">
                                                 Created / Age
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-56">
+                                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 w-56">
                                                 Restaurant & Submitter
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">
                                                 Issue & SLA Status
                                             </th>
                                         </tr>
@@ -423,7 +427,7 @@ export default function LogViewer() {
                                                             {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </div>
                                                         {log.sla && (
-                                                            <div className="mt-2 text-[10px] text-slate-500 font-mono">
+                                                            <div className="mt-2 text-[11px] text-slate-500 font-mono">
                                                                 Age: {formatSlaMinutes(log.sla.elapsedMinutes)}
                                                             </div>
                                                         )}
@@ -435,7 +439,7 @@ export default function LogViewer() {
                                                         <div className="text-xs text-slate-500 mt-0.5">
                                                             By: <span className="font-semibold text-slate-700">{log.user_name || "Unknown User"}</span>
                                                         </div>
-                                                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                        <span className="inline-block mt-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                                             Role: {log.user_role || "Staff"}
                                                         </span>
                                                     </td>
@@ -447,7 +451,7 @@ export default function LogViewer() {
                                                                     <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-900 text-white">
                                                                         {ticketNumberFromLog(log)}
                                                                     </span>
-                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                                                                         log.type === "bug" ? "bg-red-100 text-red-700 border border-red-200" :
                                                                         log.type === "feature_request" ? "bg-blue-100 text-blue-700 border border-blue-200" :
                                                                         log.type === "performance" ? "bg-yellow-100 text-yellow-800 border border-yellow-200" :
@@ -455,7 +459,7 @@ export default function LogViewer() {
                                                                     }`}>
                                                                         {log.type?.replace("_", " ")}
                                                                     </span>
-                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                                                                         normPri === "critical" ? "bg-rose-600 text-white" :
                                                                         normPri === "high" ? "bg-orange-500 text-white" :
                                                                         normPri === "low" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
@@ -463,7 +467,7 @@ export default function LogViewer() {
                                                                     }`}>
                                                                         {log.priority} priority
                                                                     </span>
-                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
                                                                         log.status === "resolved" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
                                                                         log.status === "acknowledged" ? "bg-amber-100 text-amber-800 border border-amber-200" :
                                                                         log.status === "wont_fix" ? "bg-slate-200 text-slate-700 border border-slate-300" :
@@ -473,7 +477,7 @@ export default function LogViewer() {
                                                                     </span>
                                                                     {/* SLA Badge */}
                                                                     {log.sla && (
-                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.sla.badgeClass}`}>
+                                                                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${log.sla.badgeClass}`}>
                                                                             {log.sla.badgeText}
                                                                         </span>
                                                                     )}
@@ -507,7 +511,7 @@ export default function LogViewer() {
                                                                 {log.admin_responded_by ? (
                                                                     <div className="mt-2.5 rounded-lg border border-emerald-200 bg-emerald-50/70 p-2.5">
                                                                         <div className="flex items-center justify-between text-[11px]">
-                                                                            <span className="font-bold uppercase tracking-wide text-emerald-800">
+                                                                            <span className="font-bold text-emerald-800">
                                                                                 Managed by {log.admin_responded_by}
                                                                             </span>
                                                                             <span className="text-emerald-700">
@@ -566,9 +570,9 @@ export default function LogViewer() {
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Restaurant</th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Details</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Restaurant</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Details</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -599,7 +603,7 @@ export default function LogViewer() {
 
             {/* Manage Ticket Modal */}
             {selectedFeedback && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-start justify-between gap-4">
                             <div>
@@ -674,7 +678,7 @@ export default function LogViewer() {
 
                         <div className="mt-5 space-y-4">
                             <div>
-                                <label className="mb-2 block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <label className="mb-2 block text-xs font-bold text-gray-700">
                                     Ticket Lifecycle Status
                                 </label>
                                 <select
@@ -689,7 +693,7 @@ export default function LogViewer() {
                                 </select>
                             </div>
                             <div>
-                                <label className="mb-2 block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <label className="mb-2 block text-xs font-bold text-gray-700">
                                     Management & Resolution Notes
                                 </label>
                                 <textarea

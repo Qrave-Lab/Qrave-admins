@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requirePermissionJson } from "@/lib/auth/server";
 import { listAuditLogs, getAuditStats } from "@/lib/audit";
 
 export async function GET(request: Request) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("audit.view");
   if (unauthorized) return unauthorized;
 
   try {

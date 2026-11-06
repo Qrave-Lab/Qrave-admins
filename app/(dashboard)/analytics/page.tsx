@@ -87,8 +87,8 @@ export default function AnalyticsPage() {
     return (
       <>
         <TopBar
-          title="Subscription Analytics"
-          subtitle="Plan mix, MRR, yearly run-rate, and subscription risk across all restaurants."
+          title="Subscriptions"
+          subtitle="Plan mix, MRR, run-rate and subscription risk."
           rightSlot={<RangeTabs value={range} onChange={setRange} />}
         />
         <section className="px-6 py-8 max-w-7xl mx-auto space-y-6">
@@ -109,54 +109,61 @@ export default function AnalyticsPage() {
   return (
     <>
       <TopBar
-        title="Subscription Analytics"
-        subtitle="Plan mix, MRR, yearly run-rate, and subscription risk across all restaurants."
+        title="Subscriptions"
+        subtitle="Plan mix, MRR, run-rate and subscription risk."
         rightSlot={<RangeTabs value={range} onChange={setRange} />}
       />
 
-      <section className="px-6 py-8 max-w-7xl mx-auto space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <article className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Monthly Recurring Revenue</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">₹{mrr.toLocaleString("en-IN")}</p>
-          </article>
-          <article className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Annualized Run Rate</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">₹{arr.toLocaleString("en-IN")}</p>
-          </article>
-          <article className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Average MRR / Restaurant</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">₹{avgMRR.toLocaleString("en-IN")}</p>
-          </article>
-          <article className="rounded-xl border border-red-200 bg-red-50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">At-Risk MRR</p>
-            <p className="mt-2 text-3xl font-bold text-red-700">₹{atRiskMRR.toLocaleString("en-IN")}</p>
-          </article>
-        </div>
+      <section className="px-4 py-6 sm:px-6 xl:px-8 max-w-[1500px] mx-auto space-y-6">
+        <dl className="flex flex-wrap items-end gap-x-12 gap-y-4">
+          <div>
+            <dt className="text-sm font-semibold text-slate-500">Monthly recurring revenue</dt>
+            <dd className="mt-1 text-4xl font-bold tracking-tight tabular-nums text-slate-900">₹{mrr.toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt className="text-sm font-semibold text-slate-500">Annualized run rate</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">₹{arr.toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt className="text-sm font-semibold text-slate-500">Average MRR per restaurant</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">₹{avgMRR.toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt className="text-sm font-semibold text-slate-500">At-risk MRR</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-red-700">₹{atRiskMRR.toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt className="text-sm font-semibold text-slate-500">Active and trial</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+              {overview.activeRestaurants + overview.trialRestaurants}
+              <span className="text-base font-semibold text-slate-400"> / {overview.totalRestaurants}</span>
+            </dd>
+          </div>
+        </dl>
 
-        <section className="rounded-xl border border-gray-200 bg-white">
+        <section className="rounded-2xl border border-slate-200 bg-white overflow-x-auto">
           <header className="border-b border-gray-100 px-5 py-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600">Plan Distribution</h3>
+            <h3 className="text-base font-bold tracking-tight text-slate-900">Plan distribution</h3>
           </header>
           <div className="overflow-hidden">
-            <table className="min-w-full table-fixed">
+            <table className="min-w-[560px] w-full table-fixed">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="w-[24%] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</th>
-                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Restaurants</th>
-                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">MRR</th>
-                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Yearly Value</th>
-                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">MRR Share</th>
+                  <th className="w-[24%] px-5 py-3 text-left text-xs font-semibold text-slate-500">Plan</th>
+                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold text-slate-500">Restaurants</th>
+                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold text-slate-500">MRR</th>
+                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold text-slate-500">Yearly Value</th>
+                  <th className="w-[19%] px-5 py-3 text-left text-xs font-semibold text-slate-500">MRR Share</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                 {planRows.map((row) => (
                   <tr key={row.key}>
                     <td className="px-5 py-4 text-sm font-semibold text-gray-900">{row.label}</td>
-                    <td className="px-5 py-4 text-sm text-gray-700">{row.count}</td>
-                    <td className="px-5 py-4 text-sm text-gray-700">₹{row.mrr.toLocaleString("en-IN")}</td>
-                    <td className="px-5 py-4 text-sm text-gray-700">₹{row.arr.toLocaleString("en-IN")}</td>
-                    <td className="px-5 py-4 text-sm text-gray-700">{row.contribution}%</td>
+                    <td className="px-5 py-4 text-sm tabular-nums text-gray-700">{row.count}</td>
+                    <td className="px-5 py-4 text-sm tabular-nums text-gray-700">₹{row.mrr.toLocaleString("en-IN")}</td>
+                    <td className="px-5 py-4 text-sm tabular-nums text-gray-700">₹{row.arr.toLocaleString("en-IN")}</td>
+                    <td className="px-5 py-4 text-sm tabular-nums text-gray-700">{row.contribution}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -164,22 +171,7 @@ export default function AnalyticsPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          <article className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Restaurants</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">{overview.totalRestaurants}</p>
-          </article>
-          <article className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Active + Trial</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">{overview.activeRestaurants + overview.trialRestaurants}</p>
-          </article>
-          <article className="rounded-xl border border-gray-200 bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Billing View</p>
-            <p className="mt-2 text-sm text-gray-700">
-              Monthly recurring tracked as MRR. Yearly view shown as annualized run-rate (MRR × 12).
-            </p>
-          </article>
-        </section>
+        <p className="text-sm text-slate-500">MRR is the monthly recurring total. The yearly view is annualized run rate (MRR × 12).</p>
       </section>
     </>
   );

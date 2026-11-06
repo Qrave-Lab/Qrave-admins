@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireAuthJson, requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import {
   getRestaurantEffectiveFeatures,
   updateRestaurantPlanAndFeatures,
@@ -40,7 +40,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("features.manage");
   if (unauthorized) return unauthorized;
 
   try {

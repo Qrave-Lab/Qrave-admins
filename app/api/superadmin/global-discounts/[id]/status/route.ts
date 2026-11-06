@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requirePermissionJson } from "@/lib/auth/server";
 import { setGlobalDiscountStatus } from "@/lib/superadmin/queries";
 import { recordAuditLog } from "@/lib/audit";
 import { db } from "@/lib/db";
@@ -8,7 +8,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("discounts.manage");
   if (unauthorized) return unauthorized;
 
   try {

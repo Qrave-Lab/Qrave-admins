@@ -20,8 +20,8 @@ export default async function StaffPage() {
     return (
         <>
             <TopBar
-                title="Staff Management"
-                subtitle="Review restaurant staff assignments and update operator access."
+                title="Staff"
+                subtitle="Staff accounts and roles for each restaurant."
             />
             <Suspense fallback={<div className="p-6 space-y-3 animate-pulse">{[1,2,3,4].map(i=><div key={i} className="h-12 bg-slate-100 rounded-xl" />)}</div>}>
                 <StaffManager restaurants={restaurants} />

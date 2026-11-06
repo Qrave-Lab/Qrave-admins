@@ -15,7 +15,9 @@ export type QAdminPermission =
   | "tickets.respond"
   | "finance.view"
   | "finance.export"
-  | "audit.view";
+  | "audit.view"
+  | "foodcourts.manage"
+  | "broadcasts.manage";
 
 export interface RoleDefinition {
   id: QAdminRole;
@@ -42,12 +44,14 @@ export const ROLE_DEFINITIONS: Record<QAdminRole, RoleDefinition> = {
       "finance.view",
       "finance.export",
       "audit.view",
+      "foodcourts.manage",
+      "broadcasts.manage",
     ],
   },
   ops_manager: {
     id: "ops_manager",
     name: "Operations & Support Lead",
-    description: "Manages restaurant operational access, downtime incidents, and staff support tickets. Cannot delete stores or manage operators.",
+    description: "Manages restaurant operational access, food courts, broadcast banners, downtime incidents, and staff support tickets. Cannot delete stores or manage operators.",
     badgeClass: "bg-blue-100 text-blue-800 border border-blue-200",
     permissions: [
       "restaurants.status",
@@ -55,6 +59,8 @@ export const ROLE_DEFINITIONS: Record<QAdminRole, RoleDefinition> = {
       "discounts.manage",
       "tickets.respond",
       "audit.view",
+      "foodcourts.manage",
+      "broadcasts.manage",
     ],
   },
   finance_lead: {
@@ -93,6 +99,11 @@ export function hasPermission(role: string | null | undefined, permission: QAdmi
   const def = ROLE_DEFINITIONS[normRole];
   if (!def) return false;
   return def.permissions.includes(permission);
+}
+
+export function permissionsFor(role: string | null | undefined): QAdminPermission[] {
+  const def = ROLE_DEFINITIONS[(role || "").toLowerCase().trim() as QAdminRole];
+  return def ? [...def.permissions] : [];
 }
 
 export function normalizeQAdminRole(raw: string | null | undefined): QAdminRole {

@@ -20,8 +20,8 @@ export default async function MenuPage() {
     return (
         <>
             <TopBar
-                title="Menu Management"
-                subtitle="Inspect and update live menus, categories, 3D assets, and availability."
+                title="Menu"
+                subtitle="View and edit live menus, availability and 3D models."
             />
             <Suspense fallback={<div className="px-6 py-8 grid grid-cols-1 md:grid-cols-2 gap-5 animate-pulse">{[1,2,3,4].map(i=><div key={i} className="rounded-2xl bg-slate-100 h-48" />)}</div>}>
                 <MenuManager restaurants={restaurants} />

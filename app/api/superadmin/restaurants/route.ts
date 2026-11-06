@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requireAuthJson, requirePermissionJson } from "@/lib/auth/server";
 import { createRestaurantWithOwner, listRestaurants, resolveRange } from "@/lib/superadmin/queries";
 import { recordAuditLog } from "@/lib/audit";
 
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("restaurants.status");
   if (unauthorized) return unauthorized;
 
   try {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requireAuthJson, requirePermissionJson } from "@/lib/auth/server";
 import { getRestaurantDetail } from "@/lib/superadmin/queries";
 import { db } from "@/lib/db";
 import { recordAuditLog } from "@/lib/audit";
@@ -30,7 +30,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("restaurants.delete");
   if (unauthorized) return unauthorized;
 
   try {

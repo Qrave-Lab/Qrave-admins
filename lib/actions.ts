@@ -1,20 +1,12 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { requireSessionEmail } from "@/lib/auth/server";
+import { assertPermission } from "@/lib/auth/server";
 import { revalidatePath } from "next/cache";
 import { recordAuditLog } from "@/lib/audit";
 
-async function assertQAdminSession(): Promise<string> {
-  const sessionEmail = await requireSessionEmail();
-  if (!sessionEmail) {
-    throw new Error("Unauthorized");
-  }
-  return sessionEmail;
-}
-
 export async function deleteRestaurant(restaurantId: string) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("restaurants.delete");
   try {
     const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
     const restName = rRes.rows[0]?.name || restaurantId;
@@ -42,7 +34,7 @@ export async function deleteRestaurant(restaurantId: string) {
 }
 
 export async function toggleRestaurantStatus(restaurantId: string, isActive: boolean) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("restaurants.status");
   try {
     const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
     const restName = rRes.rows[0]?.name || restaurantId;
@@ -71,7 +63,7 @@ export async function toggleRestaurantStatus(restaurantId: string, isActive: boo
 }
 
 export async function addMenuItem(restaurantId: string, data: any) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("menu.manage");
   try {
     const { name, description, price, categoryId, imageUrl, isVeg, modelGlb, isAvailable } = data;
     const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
@@ -113,7 +105,7 @@ export async function addMenuItem(restaurantId: string, data: any) {
 }
 
 export async function updateMenuItem(restaurantId: string, itemId: string, data: any) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("menu.manage");
   try {
     const { name, description, price, categoryId, imageUrl, isVeg, modelGlb, isAvailable } = data;
     const rRes = await db.query("SELECT name FROM restaurants WHERE id = $1", [restaurantId]);
@@ -152,7 +144,7 @@ export async function updateMenuItem(restaurantId: string, itemId: string, data:
 }
 
 export async function deleteMenuItem(itemId: string) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("menu.manage");
   try {
     const oldRes = await db.query(
       "SELECT name, restaurant_id FROM menu_items WHERE id = $1",
@@ -183,7 +175,7 @@ export async function deleteMenuItem(itemId: string) {
 }
 
 export async function addStaff(restaurantId: string, data: any) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("restaurants.status");
   try {
     const { email, name, phone, role } = data;
     const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -252,7 +244,7 @@ export async function addStaff(restaurantId: string, data: any) {
 }
 
 export async function updateStaff(restaurantId: string, userId: string, data: any) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("restaurants.status");
   try {
     const { email, name, phone, role } = data;
     const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -306,7 +298,7 @@ export async function updateStaff(restaurantId: string, userId: string, data: an
 }
 
 export async function toggleCoupon(couponId: string, isActive: boolean) {
-  const sessionEmail = await assertQAdminSession();
+  const sessionEmail = await assertPermission("discounts.manage");
   try {
     const cRes = await db.query(
       "SELECT name, code FROM offer_campaigns WHERE id = $1",

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireAuthJson, requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import { recordAuditLog } from "@/lib/audit";
+import { dinerBaseUrl } from "@/lib/dinerUrl";
+import { ensureTableQrTokens, tableQrUrl } from "@/lib/tableQr";
 
 export async function GET(
   request: Request,
@@ -13,7 +15,7 @@ export async function GET(
   try {
     const { id: restaurantId } = await params;
     const { searchParams } = new URL(request.url);
-    const baseUrl = searchParams.get("baseUrl") || process.env.NEXT_PUBLIC_DINER_APP_URL || "https://order.qrave.in";
+    const baseUrl = searchParams.get("baseUrl") || dinerBaseUrl();
 
     const { rows: restRows } = await db.query(
       "SELECT id, name, currency FROM restaurants WHERE id = $1",
@@ -44,10 +46,11 @@ export async function GET(
       [restaurantId],
     );
 
-    const enriched = tables.map((t: any) => ({
-      ...t,
-      qrUrl: `${baseUrl.replace(/\/$/, "")}/r/${restaurantId}/t/${t.table_number}`,
-    }));
+    const tokens = await ensureTableQrTokens(db, restaurantId, tables.map((t: any) => String(t.id)));
+    const enriched = tables.map((t: any) => {
+      const qrToken = tokens.get(String(t.id)) || "";
+      return { ...t, qrToken, qrUrl: qrToken ? tableQrUrl(baseUrl, qrToken) : "" };
+    });
 
     return NextResponse.json({
       restaurant,
@@ -64,7 +67,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("restaurants.status");
   if (unauthorized) return unauthorized;
 
   try {

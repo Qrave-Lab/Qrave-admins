@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import { db } from "@/lib/db";
 import { updateStaffFeedback } from "@/lib/superadmin/queries";
 import { recordAuditLog } from "@/lib/audit";
@@ -8,7 +8,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("tickets.respond");
   if (unauthorized) return unauthorized;
   
   try {

@@ -1,5 +1,7 @@
 "use client";
 
+import { notify } from "@/lib/ui/feedback";
+
 import { useEffect, useState, useCallback } from "react";
 import {
   Sparkles,
@@ -142,6 +144,7 @@ export default function RestaurantFeatureManager({ restaurantId, onPlanChanged }
         const data = await res.json();
         setEffective(data.effective);
         setSuccessMsg("Plan gating & feature flags updated successfully!");
+        notify.success("Feature flags saved.");
         if (onPlanChanged) onPlanChanged(selectedPlan);
         setTimeout(() => setSuccessMsg(""), 4000);
       } else {
@@ -255,7 +258,7 @@ export default function RestaurantFeatureManager({ restaurantId, onPlanChanged }
               type="date"
               value={customTrialDate}
               onChange={(e) => setCustomTrialDate(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-medium text-slate-800 focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
             />
           )}
           <p className="mt-1.5 text-[11px] text-slate-500">
@@ -355,7 +358,7 @@ export default function RestaurantFeatureManager({ restaurantId, onPlanChanged }
                 </div>
 
                 {/* Status Badges */}
-                <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
                   <span className="font-mono text-slate-400">{feat.key}</span>
                   {isOverridden ? (
                     overrideVal ? (

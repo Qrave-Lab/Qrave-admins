@@ -981,3 +981,25 @@ export async function setGlobalDiscountStatus(discountID: string, isActive: bool
     [discountID, isActive],
   );
 }
+
+/* ── website contact / access requests ── */
+
+export async function listContactRequests(limit: number = 500) {
+  const { rows } = await db.query(`
+    SELECT id, name, email, phone, restaurant_name, city, source,
+           to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+    FROM contact_requests
+    ORDER BY created_at DESC
+    LIMIT $1
+  `, [limit]);
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    restaurantName: r.restaurant_name,
+    city: r.city || "",
+    source: r.source || "",
+    createdAt: r.created_at,
+  }));
+}

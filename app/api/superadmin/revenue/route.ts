@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson } from "@/lib/auth/server";
+import { requirePermissionJson } from "@/lib/auth/server";
 import { listRevenueSeries, resolveRange } from "@/lib/superadmin/queries";
 
 export async function GET(request: Request) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("finance.view");
   if (unauthorized) return unauthorized;
 
   try {

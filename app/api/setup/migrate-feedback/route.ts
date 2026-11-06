@@ -1,7 +1,11 @@
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requirePermissionJson } from "@/lib/auth/server";
 
+// One-off schema fix. Super Admin only.
 export async function GET() {
+    const forbidden = await requirePermissionJson("qadmins.manage");
+    if (forbidden) return forbidden;
     try {
         await db.query(`
             ALTER TABLE staff_feedback ADD COLUMN IF NOT EXISTS admin_response TEXT;

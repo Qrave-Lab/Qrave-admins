@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuthJson, requireSessionEmail } from "@/lib/auth/server";
+import { requireAuthJson, requireSessionEmail, requirePermissionJson } from "@/lib/auth/server";
 import { createGlobalDiscount, listGlobalDiscounts } from "@/lib/superadmin/queries";
 import { recordAuditLog } from "@/lib/audit";
 
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = await requireAuthJson();
+  const unauthorized = await requirePermissionJson("discounts.manage");
   if (unauthorized) return unauthorized;
   try {
     const body = await request.json();
