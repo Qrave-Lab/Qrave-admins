@@ -2,8 +2,20 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { validateSuperadminCredentials } from "@/lib/auth/credentials";
-import { SESSION_COOKIE, SESSION_TTL_SECONDS, SessionSecretMissingError, signSession } from "@/lib/auth/session";
-import { loginBlocked, recordLoginFailure, clearLoginFailures } from "@/lib/auth/throttle";
+import {
+  MFA_CHALLENGE_COOKIE,
+  MFA_CHALLENGE_TTL_SECONDS,
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+  SessionSecretMissingError,
+  cookieOptions,
+  signMfaChallenge,
+  signSession,
+} from "@/lib/auth/session";
+import { getMfaStatus } from "@/lib/auth/mfa";
+import { clientIP } from "@/lib/auth/ip";
+import { twoFactorRequired } from "@/lib/auth/totp";
+import { loginBlocked, recordLoginFailure, clearLoginFailures, throttleKeys } from "@/lib/auth/throttle";
 
 type LocalAuthResult = {
   available: boolean;
@@ -33,10 +45,6 @@ async function authenticateAgainstLocalDB(username: string, password: string): P
   }
 }
 
-function clientIP(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0] : request.headers.get("x-real-ip") || "unknown").trim();
-}
 
 export async function POST(request: Request) {
   try {
@@ -48,8 +56,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Username and password required" }, { status: 400 });
     }
 
-    const throttleKey = `${clientIP(request)}|${username}`;
-    const blockedFor = loginBlocked(throttleKey);
+    const keys = throttleKeys(username, clientIP(request));
+    const blockedFor = await loginBlocked(keys);
     if (blockedFor > 0) {
       return NextResponse.json(
         { error: `Too many failed attempts. Try again in ${Math.ceil(blockedFor / 60)} min.` },
@@ -63,20 +71,42 @@ export async function POST(request: Request) {
     if (local.ok && local.id && local.username) {
       sessionID = local.id;
       sessionUsername = local.username;
-    } else if (validateSuperadminCredentials(username, password)) {
+    } else if (await validateSuperadminCredentials(username, password)) {
       sessionID = `bootstrap:${username}`;
       sessionUsername = username;
     } else {
-      recordLoginFailure(throttleKey);
+      await recordLoginFailure(keys);
       const message = local.available
         ? "Invalid credentials"
         : "QAdmin store unavailable and no matching bootstrap admin was found";
       return NextResponse.json({ error: message }, { status: local.available ? 401 : 503 });
     }
 
-    let token: string;
+    // Password is right. Next: a code from the authenticator app, or 2FA setup.
+    let mfaEnabled = false;
     try {
-      token = await signSession(sessionID, sessionUsername);
+      mfaEnabled = (await getMfaStatus(sessionID)).enabled;
+    } catch (err) {
+      console.error("2FA status lookup failed:", err);
+      if (twoFactorRequired()) {
+        return NextResponse.json({ error: "Two-step sign-in is unavailable right now. Try again shortly." }, { status: 503 });
+      }
+    }
+
+    try {
+      if (mfaEnabled) {
+        const challenge = await signMfaChallenge(sessionID, sessionUsername);
+        const res = NextResponse.json({ ok: true, mfa_required: true });
+        res.cookies.set(MFA_CHALLENGE_COOKIE, challenge, cookieOptions(MFA_CHALLENGE_TTL_SECONDS));
+        return res;
+      }
+
+      const setupRequired = twoFactorRequired();
+      const token = await signSession(sessionID, sessionUsername, setupRequired ? "setup" : "ok");
+      await clearLoginFailures(username);
+      const res = NextResponse.json({ ok: true, setup_required: setupRequired });
+      res.cookies.set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
+      return res;
     } catch (err) {
       if (err instanceof SessionSecretMissingError) {
         console.error(err.message);
@@ -87,17 +117,6 @@ export async function POST(request: Request) {
       }
       throw err;
     }
-
-    clearLoginFailures(throttleKey);
-    const res = NextResponse.json({ ok: true, message: "Logged in successfully" });
-    res.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: SESSION_TTL_SECONDS,
-    });
-    return res;
   } catch (err) {
     console.error("Login error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { addSuperadminCredential } from "@/lib/auth/credentials";
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
   }
 
   const provided = String(request.headers.get("x-bootstrap-key") || "").trim();
-  if (!provided || provided !== bootstrapKey) {
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  if (!provided || !timingSafeEqual(digest(provided), digest(bootstrapKey))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -26,6 +28,9 @@ export async function POST(request: Request) {
   if (!email.trim() || !password.trim()) {
     return NextResponse.json({ error: "email and password required" }, { status: 400 });
   }
+  if (password.trim().length < 12) {
+    return NextResponse.json({ error: "password must be at least 12 characters" }, { status: 400 });
+  }
 
   try {
     const hashedPassword = await bcrypt.hash(password.trim(), 10);
@@ -35,15 +40,15 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    const fallback = addSuperadminCredential({
+    if (err?.code === "23505") {
+      return NextResponse.json({ error: "user already exists" }, { status: 409 });
+    }
+    const fallback = await addSuperadminCredential({
       username: email.trim().toLowerCase(),
       password: password.trim(),
     });
     if (fallback.ok) {
       return NextResponse.json({ ok: true, mode: "bootstrap-memory" });
-    }
-    if (err?.code === "23505") {
-      return NextResponse.json({ error: "user already exists" }, { status: 409 });
     }
     console.error("bootstrap create user error:", err);
     return NextResponse.json({ error: "failed to create user" }, { status: 500 });

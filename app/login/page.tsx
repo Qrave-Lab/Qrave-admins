@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
+import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -11,7 +11,43 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState<"password" | "code">("password");
+  const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
   const router = useRouter();
+
+  const handleCode = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/2fa/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401 && /timed out/i.test(data.error || "")) {
+          setStep("password");
+          setPassword("");
+          setCode("");
+        }
+        setError(data.error || "That code didn't work.");
+        return;
+      }
+      if (data.used_recovery_code && typeof data.recovery_codes_left === "number" && data.recovery_codes_left <= 2) {
+        router.push("/security");
+        return;
+      }
+      router.push("/dashboard");
+    } catch {
+      setError("Unable to connect to the authentication service. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -29,7 +65,12 @@ export default function LoginPage() {
         setError(data.error || "Authentication failed. Please verify your credentials.");
         return;
       }
-      router.push("/dashboard");
+      if (data.mfa_required) {
+        setStep("code");
+        setCode("");
+        return;
+      }
+      router.push(data.setup_required ? "/security" : "/dashboard");
     } catch {
       setError("Unable to connect to the authentication service. Please try again.");
     } finally {
@@ -56,11 +97,74 @@ export default function LoginPage() {
               />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-2">
-              Sign in
+              {step === "password" ? "Sign in" : "Enter your code"}
             </h1>
+            {step === "code" && (
+              <p className="text-sm text-slate-500 mt-1">
+                {useRecovery ? "Enter one of your recovery codes." : "Open your authenticator app and enter the 6-digit code."}
+              </p>
+            )}
           </div>
 
-          {/* Form */}
+          {step === "code" ? (
+            <form onSubmit={handleCode} aria-busy={loading} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2 group">
+                <label htmlFor="code" className="text-xs font-semibold text-slate-700 ml-0.5">
+                  {useRecovery ? "Recovery code" : "Code"}
+                </label>
+                <div className="relative flex items-center">
+                  <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-slate-900 transition-colors">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <input
+                    id="code"
+                    key={useRecovery ? "recovery" : "totp"}
+                    type="text"
+                    inputMode={useRecovery ? "text" : "numeric"}
+                    autoComplete="one-time-code"
+                    autoFocus
+                    maxLength={useRecovery ? 16 : 6}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm tracking-widest text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all duration-150"
+                    placeholder={useRecovery ? "xxxxx-xxxxx" : "123456"}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <button
+                className="mt-1 w-full py-3.5 px-5 rounded-xl font-semibold text-base sm:text-sm text-white bg-[#FF5500] hover:bg-[#E64D00] disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 flex items-center justify-center gap-2 shadow-sm"
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? "Checking..." : "Verify"}
+              </button>
+              <div className="flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  className="text-slate-500 hover:text-slate-900 flex items-center gap-1"
+                  onClick={() => {
+                    setStep("password");
+                    setPassword("");
+                    setError("");
+                  }}
+                >
+                  <ArrowLeft size={14} /> Back
+                </button>
+                <button
+                  type="button"
+                  className="text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
+                  onClick={() => {
+                    setUseRecovery((v) => !v);
+                    setCode("");
+                    setError("");
+                  }}
+                >
+                  {useRecovery ? "Use app code" : "Lost your phone? Use a recovery code"}
+                </button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={handleLogin} aria-busy={loading} className="flex flex-col gap-5">
             {/* Username Input */}
             <div className="flex flex-col gap-2 group">
@@ -138,6 +242,7 @@ export default function LoginPage() {
               )}
             </motion.button>
           </form>
+          )}
 
           {/* Error Message */}
           <AnimatePresence>

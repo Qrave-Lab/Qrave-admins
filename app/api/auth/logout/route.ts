@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { MFA_CHALLENGE_COOKIE, SESSION_COOKIE } from "@/lib/auth/session";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
@@ -10,5 +10,6 @@ export async function POST() {
     path: "/",
     maxAge: 0,
   });
+  res.cookies.delete(MFA_CHALLENGE_COOKIE);
   return res;
 }

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Store, UtensilsCrossed, DollarSign, LineChart, TicketPercent,
-  Utensils, Users, FileText, ShieldCheck, Wrench, SlidersHorizontal, Inbox,
+  Utensils, Users, FileText, ShieldCheck, Wrench, SlidersHorizontal, Inbox, KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +40,7 @@ export const navGroups: NavGroup[] = [
     links: [
       { href: "/logs", label: "Logs & Support", icon: FileText, badge: { key: "tickets", tone: "red", noun: "open tickets" } },
       { href: "/qadmins", label: "QAdmin Access", icon: ShieldCheck },
+      { href: "/security", label: "Two-step Sign-in", icon: KeyRound },
     ],
   },
 ];

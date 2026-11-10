@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { getRestaurantEffectiveFeatures } from "@/lib/plans";
+import { requireAuthJson } from "@/lib/auth/server";
 
 /**
- * Public/Internal endpoint to evaluate feature flags for a given restaurant.
+ * Admin-only endpoint to evaluate feature flags for a given restaurant.
  * Usage: GET /api/features?restaurantId=...
  */
 export async function GET(request: Request) {
+  const unauthorized = await requireAuthJson();
+  if (unauthorized) return unauthorized;
   try {
     const { searchParams } = new URL(request.url);
     const restaurantId = searchParams.get("restaurantId");
